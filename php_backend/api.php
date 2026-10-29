@@ -807,6 +807,9 @@ if ($route === 'cuti' || str_starts_with($route, 'cuti/')) {
             'nama' => $body['nama'] ?? 'Pegawai',
             'jabatan' => $body['jabatan'] ?? '',
             'divisi' => $body['divisi'] ?? '',
+            'masaKerja' => $body['masaKerja'] ?? '',
+            'alamatCuti' => $body['alamatCuti'] ?? '',
+            'noTelpCuti' => $body['noTelpCuti'] ?? '',
             'tanggalPengajuan' => date('d-m-Y'),
             'tanggalMulai' => $body['tanggalMulai'] ?? date('Y-m-d'),
             'tanggalAkhir' => $body['tanggalAkhir'] ?? date('Y-m-d'),
@@ -814,8 +817,11 @@ if ($route === 'cuti' || str_starts_with($route, 'cuti/')) {
             'jatahTahun' => $body['jatahTahun'] ?? date('Y'),
             'jenisCuti' => $body['jenisCuti'] ?? 'Tahunan',
             'alasan' => $body['alasan'] ?? '',
-            'status' => 'menunggu_verif_1',
-            'statusLabel' => 'Menunggu Verifikasi 1 (Atasan Langsung)',
+            'status' => 'dalam_proses',
+            'statusLabel' => 'Dalam Proses (Silahkan Ikuti Alur)',
+            'sisaCutiN' => (int)($body['sisaCutiN'] ?? 12),
+            'sisaCutiN1' => (int)($body['sisaCutiN1'] ?? 0),
+            'sisaCuti' => (int)($body['sisaCuti'] ?? 12),
             'verifikasi' => [
                 'tahap1' => [
                     'roleRequired' => 'verifikator_1',
@@ -858,20 +864,21 @@ if ($route === 'cuti' || str_starts_with($route, 'cuti/')) {
 
         jsonResponse([
             'success' => true,
-            'message' => 'Pengajuan cuti berhasil dikirim! Menunggu Verifikasi Tahap 1 (Atasan Langsung).',
+            'message' => 'Permohonan cuti berhasil dibuat! Silahkan ikuti alur pengajuan cuti dan cetak formulir resmi BKN.',
             'data' => $newItem
         ]);
     }
 
-    // POST /api/cuti/:id/verify
-    if (str_contains($route, '/verify')) {
+    // POST /api/cuti/:id/verify or POST /api/cuti/:id/selesaikan
+    if (str_contains($route, '/verify') || str_contains($route, '/selesaikan')) {
         $parts = explode('/', $route);
         $cutiId = $parts[1] ?? '';
         $body = getJsonBody();
-        $tahap = (int)($body['tahap'] ?? 1);
+        $isSelesaikan = str_contains($route, '/selesaikan');
+        $tahap = $isSelesaikan ? 2 : (int)($body['tahap'] ?? 1);
         $action = $body['action'] ?? 'approve';
         $verifikator = $body['verifikatorUser'] ?? [];
-        $catatan = trim($body['catatan'] ?? '');
+        $catatan = trim($body['catatan'] ?? ($isSelesaikan ? 'Diselesaikan dan disahkan oleh Petugas Kepegawaian' : ''));
         $dateStr = date('d-m-Y H:i');
 
         $history = $loadCuti();
@@ -881,55 +888,76 @@ if ($route === 'cuti' || str_starts_with($route, 'cuti/')) {
         foreach ($history as &$item) {
             if ($item['id'] === $cutiId) {
                 $found = true;
-                if ($tahap === 1) {
-                    if ($action === 'approve') {
-                        $item['verifikasi']['tahap1']['status'] = 'disetujui';
-                        $item['verifikasi']['tahap1']['tanggal'] = $dateStr;
-                        $item['verifikasi']['tahap1']['verifikatorNama'] = $verifikator['nama'] ?? 'Verifikator 1';
-                        $item['verifikasi']['tahap1']['verifikatorNip'] = $verifikator['nip'] ?? '-';
-                        $item['verifikasi']['tahap1']['catatan'] = $catatan ?: 'Disetujui oleh Atasan Langsung';
-                        $item['status'] = 'menunggu_verif_2';
-                        $item['statusLabel'] = 'Menunggu Verifikasi 2 (Kepala Bagian TU)';
-                    } else {
-                        $item['verifikasi']['tahap1']['status'] = 'ditolak';
-                        $item['verifikasi']['tahap1']['tanggal'] = $dateStr;
-                        $item['verifikasi']['tahap1']['verifikatorNama'] = $verifikator['nama'] ?? 'Verifikator 1';
-                        $item['verifikasi']['tahap1']['verifikatorNip'] = $verifikator['nip'] ?? '-';
-                        $item['verifikasi']['tahap1']['catatan'] = $catatan ?: 'Pengajuan ditolak pada verifikasi tahap 1';
-                        $item['status'] = 'ditolak_verif_1';
-                        $item['statusLabel'] = 'Ditolak oleh Verifikator 1';
-                    }
-                } elseif ($tahap === 2) {
-                    if ($action === 'approve') {
-                        $item['verifikasi']['tahap2']['status'] = 'disetujui';
-                        $item['verifikasi']['tahap2']['tanggal'] = $dateStr;
-                        $item['verifikasi']['tahap2']['verifikatorNama'] = $verifikator['nama'] ?? 'Verifikator 2';
-                        $item['verifikasi']['tahap2']['verifikatorNip'] = $verifikator['nip'] ?? '-';
-                        $item['verifikasi']['tahap2']['catatan'] = $catatan ?: 'Disetujui secara final oleh Kepala Bagian TU';
-                        $item['status'] = 'disetujui';
-                        $item['statusLabel'] = 'Disetujui Lengkap (Final)';
+                // ACC Tunggal (Satu Kali Approval Langsung Selesai & Potong Kuota Cuti)
+                if ($action === 'approve' || $action === 'acc') {
+                    $item['verifikasi']['tahap1']['status'] = 'disetujui';
+                    $item['verifikasi']['tahap1']['tanggal'] = $dateStr;
+                    $item['verifikasi']['tahap1']['verifikatorNama'] = $verifikator['nama'] ?? 'Pejabat Berwenang / Admin';
+                    $item['verifikasi']['tahap1']['verifikatorNip'] = $verifikator['nip'] ?? '-';
+                    $item['verifikasi']['tahap1']['catatan'] = $catatan ?: 'Disetujui (ACC Final)';
 
-                        // Potong cuti
-                        if ($item['jenisCuti'] === 'Tahunan') {
-                            $days = (int)$item['jumlahHari'];
-                            if ($useMysql && $pdo) {
-                                try {
-                                    $stmt = $pdo->prepare("UPDATE tb_pegawai SET sisa_cuti = GREATEST(0, sisa_cuti - ?), cuti_terpakai = cuti_terpakai + ? WHERE nip = ? OR pegawai_id = ?");
-                                    if ($stmt && is_object($stmt)) {
-                                        $stmt->execute([$days, $days, $item['nip'], $item['pegawaiId']]);
-                                    }
-                                } catch (\Throwable $e) {}
+                    $item['verifikasi']['tahap2']['status'] = 'disetujui';
+                    $item['verifikasi']['tahap2']['tanggal'] = $dateStr;
+                    $item['verifikasi']['tahap2']['verifikatorNama'] = $verifikator['nama'] ?? 'Pejabat Berwenang / Admin';
+                    $item['verifikasi']['tahap2']['verifikatorNip'] = $verifikator['nip'] ?? '-';
+                    $item['verifikasi']['tahap2']['catatan'] = $catatan ?: 'Pengajuan cuti disahkan dan selesai';
+
+                    $item['status'] = 'disetujui';
+                    $item['statusLabel'] = 'Disetujui / Selesai (Di-ACC)';
+
+                    // Potong cuti langsung dengan skema FIFO (N-1 lalu N)
+                    if ($item['jenisCuti'] === 'Tahunan') {
+                        $durasi = (int)$item['jumlahHari'];
+                        $pegawaiList = getFallbackPegawai();
+                        foreach ($pegawaiList as &$p) {
+                            if ($p['nip'] === $item['nip'] || $p['id'] === $item['pegawaiId']) {
+                                $sisaN1 = (int)($p['sisaCutiN1'] ?? 0);
+                                $sisaN = (int)($p['sisaCutiN'] ?? ($p['sisaCuti'] ?? 12));
+                                $sisaKebutuhan = $durasi;
+
+                                if ($sisaN1 > 0) {
+                                    $potongN1 = min($sisaKebutuhan, $sisaN1);
+                                    $sisaN1 -= $potongN1;
+                                    $sisaKebutuhan -= $potongN1;
+                                }
+                                if ($sisaKebutuhan > 0) {
+                                    $sisaN = max(0, $sisaN - $sisaKebutuhan);
+                                }
+
+                                $p['sisaCutiN1'] = $sisaN1;
+                                $p['sisaCutiN'] = $sisaN;
+                                $p['sisaCuti'] = $sisaN1 + $sisaN;
+                                $p['cutiTerpakai'] = (int)($p['cutiTerpakai'] ?? 0) + $durasi;
+                                break;
                             }
                         }
-                    } else {
-                        $item['verifikasi']['tahap2']['status'] = 'ditolak';
-                        $item['verifikasi']['tahap2']['tanggal'] = $dateStr;
-                        $item['verifikasi']['tahap2']['verifikatorNama'] = $verifikator['nama'] ?? 'Verifikator 2';
-                        $item['verifikasi']['tahap2']['verifikatorNip'] = $verifikator['nip'] ?? '-';
-                        $item['verifikasi']['tahap2']['catatan'] = $catatan ?: 'Pengajuan ditolak pada verifikasi tahap 2';
-                        $item['status'] = 'ditolak_verif_2';
-                        $item['statusLabel'] = 'Ditolak oleh Verifikator 2';
+                        saveFallbackPegawai($pegawaiList);
+
+                        if ($useMysql && $pdo) {
+                            try {
+                                $stmt = $pdo->prepare("UPDATE tb_pegawai SET sisa_cuti = GREATEST(0, sisa_cuti - ?), cuti_terpakai = cuti_terpakai + ? WHERE nip = ? OR pegawai_id = ?");
+                                if ($stmt && is_object($stmt)) {
+                                    $stmt->execute([$durasi, $durasi, $item['nip'], $item['pegawaiId']]);
+                                }
+                            } catch (\Throwable $e) {}
+                        }
                     }
+                } else {
+                    // Ditolak
+                    $item['verifikasi']['tahap1']['status'] = 'ditolak';
+                    $item['verifikasi']['tahap1']['tanggal'] = $dateStr;
+                    $item['verifikasi']['tahap1']['verifikatorNama'] = $verifikator['nama'] ?? 'Pejabat Berwenang / Admin';
+                    $item['verifikasi']['tahap1']['verifikatorNip'] = $verifikator['nip'] ?? '-';
+                    $item['verifikasi']['tahap1']['catatan'] = $catatan ?: 'Pengajuan cuti ditolak';
+
+                    $item['verifikasi']['tahap2']['status'] = 'ditolak';
+                    $item['verifikasi']['tahap2']['tanggal'] = $dateStr;
+                    $item['verifikasi']['tahap2']['verifikatorNama'] = $verifikator['nama'] ?? 'Pejabat Berwenang / Admin';
+                    $item['verifikasi']['tahap2']['verifikatorNip'] = $verifikator['nip'] ?? '-';
+                    $item['verifikasi']['tahap2']['catatan'] = $catatan ?: 'Pengajuan cuti ditolak';
+
+                    $item['status'] = 'ditolak';
+                    $item['statusLabel'] = 'Ditolak';
                 }
                 $targetItem = $item;
                 break;
@@ -1044,30 +1072,99 @@ if ($route === 'adms/api/logs' || $route === 'adms/logs') {
         }
     }
 
+    $dateParam = trim($_GET['date'] ?? '');
+
     if (empty($logs)) {
-        $admsLogPath = __DIR__ . '/admsLogs.json';
-        $allLogs = file_exists($admsLogPath) ? json_decode(file_get_contents($admsLogPath), true) : [];
-        if (!is_array($allLogs)) $allLogs = [];
+        // 3. Live bridge to dedicated ADMS machine receiver on adms.brmpdiy.id
+        try {
+            $ctx = stream_context_create([
+                'http' => ['timeout' => 3, 'header' => "User-Agent: BRMP-Kita-Portal\r\n"],
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]
+            ]);
 
-        if ($role === 'admin' && empty($nip)) {
-            $logs = $allLogs;
-        } else if (!empty($nip)) {
-            $peg = findPegawai($nip, $pdo, $useMysql);
-            $userNip = $peg['nip'] ?? $nip;
-            $userPin = (string)($peg['pinMesin'] ?? '');
-            $userNama = strtolower(trim($peg['nama'] ?? ''));
+            $daysToQuery = [];
+            if (!empty($dateParam) && $dateParam !== 'all' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateParam)) {
+                $daysToQuery[] = $dateParam;
+            } else {
+                // Fetch full history: today, yesterday, and past 14 days to capture all recorded syncs
+                for ($d = 0; $d <= 14; $d++) {
+                    $daysToQuery[] = date('Y-m-d', strtotime("-$d days"));
+                }
+            }
 
-            $logs = array_values(array_filter($allLogs, function($l) use ($userNip, $userPin, $userNama) {
-                $lPin = (string)($l['pin'] ?? '');
-                $lNama = strtolower(trim($l['nama'] ?? ''));
+            $rawItems = [];
+            $seenKeys = [];
 
-                if ($lPin === $userNip) return true;
-                if (!empty($userPin) && $lPin === $userPin) return true;
-                if (!empty($userNama) && ($lNama === $userNama || str_contains($lNama, $userNama))) return true;
-                return false;
-            }));
-        } else {
-            $logs = ($role === 'admin') ? $allLogs : [];
+            foreach ($daysToQuery as $dayStr) {
+                $upstream = @file_get_contents("http://adms.brmpdiy.id/api/logs?date=$dayStr", false, $ctx);
+                if (empty($upstream)) continue;
+                $upstreamJson = json_decode($upstream, true);
+                if (!empty($upstreamJson['data']) && is_array($upstreamJson['data'])) {
+                    foreach ($upstreamJson['data'] as $l) {
+                        $p = (string)($l['pin'] ?? '');
+                        $dt = $l['datetime'] ?? (($l['tanggal'] ?? $dayStr) . ' ' . ($l['jam'] ?? '00:00:00'));
+                        $dedupKey = $p . '_' . $dt;
+                        if (isset($seenKeys[$dedupKey])) continue;
+                        $seenKeys[$dedupKey] = true;
+
+                        $rawItems[] = [
+                            'id' => $l['id'] ?? (count($rawItems) + 1),
+                            'sn' => $l['sn'] ?? 'UCR6235200084',
+                            'pin' => $p,
+                            'nama' => $l['nama'] ?? 'Pegawai',
+                            'jabatan' => $l['jabatan'] ?? 'Pegawai BRMP DIY',
+                            'datetime' => $dt,
+                            'tanggal' => $l['tanggal'] ?? $dayStr,
+                            'jam' => $l['jam'] ?? substr($dt, 11, 8),
+                            'statusAbsen' => $l['status'] ?? $l['statusAbsen'] ?? 'Masuk',
+                            'keterangan' => $l['keterangan'] ?? 'Tepat Waktu'
+                        ];
+                    }
+                }
+            }
+
+            // Sort newest datetime first
+            usort($rawItems, function($a, $b) {
+                return strcmp($b['datetime'] ?? '', $a['datetime'] ?? '');
+            });
+
+            if ($role === 'admin' && empty($nip)) {
+                $logs = $rawItems;
+            } else if (!empty($nip)) {
+                $logs = array_values(array_filter($rawItems, function($l) use ($nip) {
+                    $lPin = (string)($l['pin'] ?? '');
+                    return $lPin === $nip || str_contains($lPin, $nip);
+                }));
+            } else {
+                $logs = $rawItems;
+            }
+        } catch (\Throwable $e) {}
+
+        if (empty($logs)) {
+            $admsLogPath = __DIR__ . '/admsLogs.json';
+            $allLogs = file_exists($admsLogPath) ? json_decode(file_get_contents($admsLogPath), true) : [];
+            if (!is_array($allLogs)) $allLogs = [];
+
+            if ($role === 'admin' && empty($nip)) {
+                $logs = $allLogs;
+            } else if (!empty($nip)) {
+                $peg = findPegawai($nip, $pdo, $useMysql);
+                $userNip = $peg['nip'] ?? $nip;
+                $userPin = (string)($peg['pinMesin'] ?? '');
+                $userNama = strtolower(trim($peg['nama'] ?? ''));
+
+                $logs = array_values(array_filter($allLogs, function($l) use ($userNip, $userPin, $userNama) {
+                    $lPin = (string)($l['pin'] ?? '');
+                    $lNama = strtolower(trim($l['nama'] ?? ''));
+
+                    if ($lPin === $userNip) return true;
+                    if (!empty($userPin) && $lPin === $userPin) return true;
+                    if (!empty($userNama) && ($lNama === $userNama || str_contains($lNama, $userNama))) return true;
+                    return false;
+                }));
+            } else {
+                $logs = ($role === 'admin') ? $allLogs : [];
+            }
         }
     }
 
@@ -1123,6 +1220,31 @@ if ($route === 'adms/api/machines' || $route === 'adms/machines') {
             }
         } catch (Exception $e) {}
     }
+
+    // 3. Fallback: Bridge live from dedicated ADMS server at adms.brmpdiy.id
+    try {
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 2, 'header' => "User-Agent: BRMP-Kita-Portal\r\n"],
+            'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]
+        ]);
+        $upstream = @file_get_contents('http://adms.brmpdiy.id/api/machines', false, $ctx);
+        if (!empty($upstream)) {
+            $upstreamJson = json_decode($upstream, true);
+            if (!empty($upstreamJson['data']) && is_array($upstreamJson['data'])) {
+                $mapped = array_map(function($m) {
+                    return [
+                        'sn' => $m['sn'],
+                        'namaMesin' => $m['nama_mesin'] ?? ($m['namaMesin'] ?? 'Mesin Absensi Lobi Utama BRMP DIY'),
+                        'ip' => $m['ip'] ?? '10.0.5.1',
+                        'lastSync' => $m['last_sync'] ?? ($m['lastSync'] ?? date('Y-m-d H:i:s')),
+                        'status' => $m['status'] ?? 'Online',
+                        'totalLogs' => (int)($m['total_logs'] ?? ($m['totalLogs'] ?? 0))
+                    ];
+                }, $upstreamJson['data']);
+                jsonResponse(['success' => true, 'data' => $mapped]);
+            }
+        }
+    } catch (\Throwable $e) {}
 
     // POST - Tambah Mesin Baru
     if ($method === 'POST') {
@@ -1246,9 +1368,15 @@ if ($route === 'absensi/bulanan') {
 
     if ($useMysql && $pdo) {
         try {
-            $sql = "SELECT h.*, p.nama_ptk FROM tweb_pegawai_hadir h 
-                    LEFT JOIN t_ptk p ON (h.NO_INDUK = p.nomor_absensi OR h.NO_INDUK = p.nip)
-                    WHERE MONTH(h.TANGGAL) = ? AND YEAR(h.TANGGAL) = ?";
+            if (!empty($isSqlite)) {
+                $sql = "SELECT h.*, p.nama_ptk FROM tweb_pegawai_hadir h 
+                        LEFT JOIN t_ptk p ON (h.NO_INDUK = p.nomor_absensi OR h.NO_INDUK = p.nip)
+                        WHERE CAST(strftime('%m', h.TANGGAL) AS INTEGER) = ? AND CAST(strftime('%Y', h.TANGGAL) AS INTEGER) = ?";
+            } else {
+                $sql = "SELECT h.*, p.nama_ptk FROM tweb_pegawai_hadir h 
+                        LEFT JOIN t_ptk p ON (h.NO_INDUK = p.nomor_absensi OR h.NO_INDUK = p.nip)
+                        WHERE MONTH(h.TANGGAL) = ? AND YEAR(h.TANGGAL) = ?";
+            }
             $params = [$bulan, $tahun];
             if (!empty($nip)) {
                 $sql .= " AND (h.NO_INDUK = ? OR p.nip = ?)";
@@ -1259,6 +1387,36 @@ if ($route === 'absensi/bulanan') {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $rawRows = $stmt->fetchAll();
+
+            // Fallback to tb_adms_logs if tweb_pegawai_hadir was empty
+            if (empty($rawRows)) {
+                try {
+                    if (!empty($isSqlite)) {
+                        $sql2 = "SELECT * FROM tb_adms_logs WHERE CAST(strftime('%m', tanggal) AS INTEGER) = ? AND CAST(strftime('%Y', tanggal) AS INTEGER) = ?";
+                    } else {
+                        $sql2 = "SELECT * FROM tb_adms_logs WHERE MONTH(tanggal) = ? AND YEAR(tanggal) = ?";
+                    }
+                    $params2 = [$bulan, $tahun];
+                    if (!empty($nip)) {
+                        $sql2 .= " AND (pin = ? OR pin LIKE ?)";
+                        $params2[] = $nip;
+                        $params2[] = "%$nip%";
+                    }
+                    $sql2 .= " ORDER BY tanggal ASC, jam ASC";
+                    $stmt2 = $pdo->prepare($sql2);
+                    $stmt2->execute($params2);
+                    $altRows = $stmt2->fetchAll();
+                    foreach ($altRows as $ar) {
+                        $rawRows[] = [
+                            'TANGGAL' => $ar['tanggal'],
+                            'JAM' => $ar['jam'],
+                            'STATUS' => ($ar['status_absen'] === 'Masuk' ? '0' : '1'),
+                            'NO_INDUK' => $ar['pin'],
+                            'nama_ptk' => $ar['nama']
+                        ];
+                    }
+                } catch (\Throwable $e2) {}
+            }
 
             // Group by date
             $byDate = [];
@@ -1618,6 +1776,472 @@ if ($route === 'admin/settings') {
             'message' => 'Pengaturan balai dan radius geofence GPS berhasil diperbarui',
             'data' => $settings
         ]);
+    }
+}
+
+// -------------------------------------------------------
+// 10. CUTI: GET /api/cuti, POST /api/cuti, POST /api/cuti/:id/verify, POST /api/cuti/:id/selesaikan, DELETE /api/cuti/:id
+// -------------------------------------------------------
+if ($route === 'cuti' || str_starts_with($route, 'cuti/')) {
+    $parts = explode('/', $route);
+    $actionId = $parts[1] ?? '';
+    $subAction = $parts[2] ?? '';
+
+    // Ensure tb_cuti table exists
+    if ($pdo) {
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS tb_cuti (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cuti_code TEXT UNIQUE,
+                no_urut INTEGER,
+                pegawai_id TEXT,
+                nip TEXT,
+                nama TEXT,
+                jabatan TEXT,
+                divisi TEXT,
+                masa_kerja TEXT,
+                alamat_cuti TEXT,
+                no_telp_cuti TEXT,
+                tanggal_pengajuan TEXT,
+                tanggal_mulai TEXT,
+                tanggal_akhir TEXT,
+                jumlah_hari INTEGER,
+                jatah_tahun TEXT,
+                jenis_cuti TEXT,
+                alasan TEXT,
+                status TEXT DEFAULT 'dalam_proses',
+                status_label TEXT DEFAULT 'Dalam Proses (Silahkan Ikuti Alur)',
+                verif_1_status TEXT DEFAULT 'menunggu',
+                verif_1_nama TEXT DEFAULT NULL,
+                verif_1_nip TEXT DEFAULT NULL,
+                verif_1_tanggal TEXT DEFAULT NULL,
+                verif_1_catatan TEXT DEFAULT NULL,
+                verif_2_status TEXT DEFAULT 'menunggu',
+                verif_2_nama TEXT DEFAULT NULL,
+                verif_2_nip TEXT DEFAULT NULL,
+                verif_2_tanggal TEXT DEFAULT NULL,
+                verif_2_catatan TEXT DEFAULT NULL,
+                detail_json TEXT DEFAULT NULL,
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )");
+            try { $pdo->exec("ALTER TABLE tb_cuti ADD COLUMN detail_json TEXT DEFAULT NULL"); } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {}
+    }
+
+    // Helper format single row
+    $formatRow = function($r) {
+        $detail = [];
+        if (!empty($r['detail_json'])) {
+            $detail = json_decode($r['detail_json'], true) ?: [];
+        }
+
+        $idStr = $r['cuti_code'] ?: ('CUTI-2026-' . str_pad((string)$r['id'], 3, '0', STR_PAD_LEFT));
+        $sisaN = isset($detail['catatanCuti']['n']) ? $detail['catatanCuti']['n'] : 12;
+        $sisaN1 = isset($detail['catatanCuti']['n1']) ? $detail['catatanCuti']['n1'] : 0;
+        $sisaN2 = isset($detail['catatanCuti']['n2']) ? $detail['catatanCuti']['n2'] : 0;
+
+        return [
+            'id' => $idStr,
+            'no' => (int)($r['no_urut'] ?: $r['id']),
+            'pegawaiId' => $r['pegawai_id'],
+            'nip' => $r['nip'],
+            'nama' => $r['nama'],
+            'jabatan' => $r['jabatan'] ?: 'Pegawai BRMP DIY',
+            'divisi' => $r['divisi'] ?: 'Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta',
+            'masaKerja' => $r['masa_kerja'] ?: '01 Tahun 03 Bulan',
+            'alamatCuti' => $r['alamat_cuti'] ?: 'Yogyakarta',
+            'noTelpCuti' => $r['no_telp_cuti'] ?: '-',
+            'tanggalPengajuan' => $r['tanggal_pengajuan'] ?: date('d-m-Y'),
+            'tanggalMulai' => $r['tanggal_mulai'],
+            'tanggalAkhir' => $r['tanggal_akhir'],
+            'jumlahHari' => (int)$r['jumlah_hari'],
+            'jatahTahun' => $r['jatah_tahun'] ?: '2026',
+            'jenisCuti' => $r['jenis_cuti'] ?: 'Tahunan',
+            'alasan' => $r['alasan'] ?: '-',
+            'status' => $r['status'] ?: 'dalam_proses',
+            'statusLabel' => $r['status_label'] ?: 'Dalam Proses (Silahkan Ikuti Alur)',
+            'catatanCuti' => $detail['catatanCuti'] ?? [
+                'n2' => $sisaN2,
+                'n1' => $sisaN1,
+                'n' => $sisaN,
+                'keteranganN2' => '-',
+                'keteranganN1' => "{$sisaN1} hari",
+                'keteranganN' => "{$sisaN} hari"
+            ],
+            'atasanLangsung' => $detail['atasanLangsung'] ?? [
+                'nama' => 'Agung Ariyanto, SEI, M.Ec.Dev',
+                'nip' => '198101312009121004',
+                'jabatan' => 'Ketua Tim Kerja SDM / Atasan Langsung',
+                'keputusan' => 'DISETUJUI'
+            ],
+            'pejabatBerwenang' => $detail['pejabatBerwenang'] ?? [
+                'nama' => 'Dr. Soeharsono, S.Pt, M.Si',
+                'nip' => '197109271998031002',
+                'jabatan' => 'Kepala Balai Besar Penerapan Modernisasi Pertanian',
+                'keputusan' => 'DISETUJUI'
+            ],
+            'verifikasi' => $detail['verifikasi'] ?? [
+                'tahap1' => [
+                    'roleRequired' => 'verifikator_1',
+                    'label' => 'Pertimbangan Atasan Langsung',
+                    'status' => $r['verif_1_status'] ?: 'menunggu',
+                    'verifikatorNama' => $r['verif_1_nama'] ?: 'Agung Ariyanto, SEI, M.Ec.Dev',
+                    'verifikatorNip' => $r['verif_1_nip'] ?: '198101312009121004',
+                    'tanggal' => $r['verif_1_tanggal'],
+                    'catatan' => $r['verif_1_catatan'] ?: 'Menunggu pertimbangan atasan'
+                ],
+                'tahap2' => [
+                    'roleRequired' => 'verifikator_2',
+                    'label' => 'Penyelesaian Petugas Kepegawaian',
+                    'status' => $r['verif_2_status'] ?: 'menunggu',
+                    'verifikatorNama' => $r['verif_2_nama'] ?: 'Dr. Soeharsono, S.Pt, M.Si',
+                    'verifikatorNip' => $r['verif_2_nip'] ?: '197109271998031002',
+                    'tanggal' => $r['verif_2_tanggal'],
+                    'catatan' => $r['verif_2_catatan'] ?: 'Menunggu penyelesaian alur oleh petugas'
+                ]
+            ]
+        ];
+    };
+
+    // 1. GET /api/cuti
+    if ($method === 'GET') {
+        $nip = trim($_GET['nip'] ?? '');
+        $role = trim($_GET['role'] ?? '');
+
+        // Find user profile
+        $userObj = null;
+        if (!empty($nip)) {
+            $userObj = findPegawai($nip, $pdo, $useMysql);
+        }
+        if (!$userObj) {
+            $userObj = findPegawai('198808062014032001', $pdo, $useMysql) ?: [
+                'id' => 'PEG-001',
+                'nip' => '198808062014032001',
+                'nama' => 'Agnita Verdiani Putri, A.Md',
+                'jabatan' => 'Pegawai BRMP DIY',
+                'divisi' => 'Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta',
+                'systemRole' => 'pegawai',
+                'approvalRole' => 'pemohon',
+                'roleLabel' => 'Pegawai BRMP DIY',
+                'sisaCuti' => 12,
+                'cutiTerpakai' => 0
+            ];
+        }
+
+        $allRows = [];
+        if ($pdo) {
+            try {
+                $stmt = $pdo->query("SELECT * FROM tb_cuti ORDER BY id DESC");
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $allRows[] = $formatRow($row);
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // Filter for current employee
+        $myHistory = [];
+        foreach ($allRows as $c) {
+            if ($c['nip'] === $userObj['nip'] || (string)$c['pegawaiId'] === (string)$userObj['id']) {
+                $myHistory[] = $c;
+            }
+        }
+
+        $pendingCuti = array_values(array_filter($allRows, function($c) {
+            return $c['status'] === 'dalam_proses' || str_starts_with($c['status'], 'menunggu');
+        }));
+
+        $disetujuiCount = count(array_filter($allRows, fn($c) => $c['status'] === 'disetujui'));
+        $ditolakCount = count(array_filter($allRows, fn($c) => str_starts_with($c['status'], 'ditolak')));
+
+        $totalSisa = (int)($userObj['sisaCuti'] ?? 12);
+        $sisaN = min(12, $totalSisa);
+        $sisaN1 = max(0, $totalSisa - 12);
+
+        jsonResponse([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $userObj['id'],
+                    'nip' => $userObj['nip'],
+                    'nama' => $userObj['nama'],
+                    'jabatan' => $userObj['jabatan'],
+                    'divisi' => $userObj['divisi'],
+                    'systemRole' => $userObj['systemRole'],
+                    'approvalRole' => $userObj['approvalRole'],
+                    'roleLabel' => $userObj['roleLabel'],
+                    'sisaCuti' => $totalSisa,
+                    'sisaCutiN' => $sisaN,
+                    'sisaCutiN1' => $sisaN1,
+                    'cutiTerpakai' => (int)($userObj['cutiTerpakai'] ?? 0),
+                    'expiredCuti' => $userObj['expiredCuti'] ?? "31-12-2026",
+                    'masaKerja' => $userObj['masaKerja'] ?? "01 Tahun 03 Bulan",
+                    'alamat' => $userObj['alamat'] ?? "Yogyakarta",
+                    'noHp' => $userObj['noHp'] ?? "085268238966",
+                    'sisaCutiText' => "2026 - Total Sisa {$totalSisa} Hari (N-1: {$sisaN1} Hari, N: {$sisaN} Hari)"
+                ],
+                'jenisCutiOptions' => [
+                    "Tahunan",
+                    "Sakit",
+                    "Alasan Penting",
+                    "Melahirkan",
+                    "Karena Istri Melahirkan",
+                    "Cuti Besar",
+                    "Cuti di Luar Tanggungan Negara"
+                ],
+                'history' => $allRows,
+                'myHistory' => $myHistory,
+                'pendingVerif1' => $pendingCuti,
+                'pendingVerif2' => $pendingCuti,
+                'pendingCuti' => $pendingCuti,
+                'summary' => [
+                    'totalPengajuan' => count($allRows),
+                    'dalamProses' => count($pendingCuti),
+                    'menungguVerif1' => count($pendingCuti),
+                    'menungguVerif2' => 0,
+                    'disetujui' => $disetujuiCount,
+                    'ditolak' => $ditolakCount
+                ]
+            ]
+        ]);
+    }
+
+    // 2. POST /api/cuti (Pegawai mengajukan cuti baru)
+    if ($method === 'POST' && empty($actionId)) {
+        $body = getJsonBody();
+        $nip = trim($body['nip'] ?? '');
+        $pegawaiId = trim($body['pegawaiId'] ?? '');
+        $nama = trim($body['nama'] ?? '');
+        $jabatan = trim($body['jabatan'] ?? 'Pegawai BRMP DIY');
+        $divisi = trim($body['divisi'] ?? 'Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta');
+        $jenisCuti = trim($body['jenisCuti'] ?? 'Tahunan');
+        $tanggalMulai = trim($body['tanggalMulai'] ?? '');
+        $tanggalAkhir = trim($body['tanggalAkhir'] ?? '');
+        $alasan = trim($body['alasan'] ?? '');
+        $alamatCuti = trim($body['alamatCuti'] ?? 'Yogyakarta');
+        $noTelpCuti = trim($body['noTelpCuti'] ?? '-');
+        $masaKerja = trim($body['masaKerja'] ?? '01 Tahun 03 Bulan');
+
+        if (empty($jenisCuti) || empty($tanggalMulai) || empty($tanggalAkhir) || empty($alasan)) {
+            jsonResponse(['success' => false, 'message' => 'Jenis cuti, tanggal mulai, tanggal akhir, dan alasan cuti wajib diisi'], 400);
+        }
+
+        // Format date helper: YYYY-MM-DD -> DD-MM-YYYY
+        $fmt = function($d) {
+            $p = explode('-', $d);
+            return count($p) === 3 ? "{$p[2]}-{$p[1]}-{$p[0]}" : $d;
+        };
+
+        $start = new DateTime($tanggalMulai);
+        $end = new DateTime($tanggalAkhir);
+        if ($end < $start) {
+            jsonResponse(['success' => false, 'message' => 'Tanggal akhir cuti tidak boleh lebih awal dari tanggal mulai cuti'], 400);
+        }
+        $diffDays = $end->diff($start)->days + 1;
+
+        $userProfile = findPegawai($nip, $pdo, $useMysql);
+        $totalSisa = (int)($userProfile['sisaCuti'] ?? 12);
+        $sisaN = min(12, $totalSisa);
+        $sisaN1 = max(0, $totalSisa - 12);
+
+        if ($jenisCuti === 'Tahunan' && $totalSisa < $diffDays) {
+            jsonResponse(['success' => false, 'message' => "Total sisa kuota cuti tahunan tidak mencukupi (Tersisa: {$totalSisa} hari, Pengajuan: {$diffDays} hari)"], 400);
+        }
+
+        // Count existing rows
+        $nextNo = 1;
+        if ($pdo) {
+            $nextNo = (int)$pdo->query("SELECT COUNT(*) FROM tb_cuti")->fetchColumn() + 1;
+        }
+        $cutiCode = 'CUTI-2026-' . str_pad((string)$nextNo, 3, '0', STR_PAD_LEFT);
+
+        $detail = [
+            'catatanCuti' => [
+                'n2' => 0,
+                'n1' => $sisaN1,
+                'n' => $sisaN,
+                'keteranganN2' => '-',
+                'keteranganN1' => "{$sisaN1} hari",
+                'keteranganN' => "{$sisaN} hari"
+            ],
+            'atasanLangsung' => [
+                'nama' => 'Agung Ariyanto, SEI, M.Ec.Dev',
+                'nip' => '198101312009121004',
+                'jabatan' => 'Ketua Tim Kerja SDM / Atasan Langsung',
+                'keputusan' => 'DISETUJUI'
+            ],
+            'pejabatBerwenang' => [
+                'nama' => 'Dr. Soeharsono, S.Pt, M.Si',
+                'nip' => '197109271998031002',
+                'jabatan' => 'Kepala Balai Besar Penerapan Modernisasi Pertanian',
+                'keputusan' => 'DISETUJUI'
+            ],
+            'verifikasi' => [
+                'tahap1' => [
+                    'roleRequired' => 'verifikator_1',
+                    'label' => 'Pertimbangan Atasan Langsung',
+                    'status' => 'menunggu',
+                    'verifikatorNama' => 'Agung Ariyanto, SEI, M.Ec.Dev',
+                    'verifikatorNip' => '198101312009121004',
+                    'tanggal' => null,
+                    'catatan' => 'Menunggu paraf berkas cetak fisik'
+                ],
+                'tahap2' => [
+                    'roleRequired' => 'verifikator_2',
+                    'label' => 'Penyelesaian Petugas Kepegawaian',
+                    'status' => 'menunggu',
+                    'verifikatorNama' => 'Dr. Soeharsono, S.Pt, M.Si',
+                    'verifikatorNip' => '197109271998031002',
+                    'tanggal' => null,
+                    'catatan' => 'Menunggu penyelesaian alur oleh petugas'
+                ]
+            ]
+        ];
+
+        $todayStr = date('d-m-Y');
+        $tglMulaiFmt = $fmt($tanggalMulai);
+        $tglAkhirFmt = $fmt($tanggalAkhir);
+
+        if ($pdo) {
+            $stmt = $pdo->prepare("INSERT INTO tb_cuti (
+                cuti_code, no_urut, pegawai_id, nip, nama, jabatan, divisi, masa_kerja,
+                alamat_cuti, no_telp_cuti, tanggal_pengajuan, tanggal_mulai, tanggal_akhir,
+                jumlah_hari, jatah_tahun, jenis_cuti, alasan, status, status_label,
+                verif_1_status, verif_2_status, detail_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            $stmt->execute([
+                $cutiCode, $nextNo, $pegawaiId ?: $userProfile['id'], $nip ?: $userProfile['nip'],
+                $nama ?: $userProfile['nama'], $jabatan, $divisi, $masaKerja,
+                $alamatCuti, $noTelpCuti, $todayStr, $tglMulaiFmt, $tglAkhirFmt,
+                $diffDays, '2026', $jenisCuti, $alasan, 'dalam_proses',
+                'Dalam Proses (Silahkan Ikuti Alur)', 'menunggu', 'menunggu',
+                json_encode($detail, JSON_UNESCAPED_UNICODE)
+            ]);
+        }
+
+        $newRow = [
+            'id' => $cutiCode,
+            'no' => $nextNo,
+            'pegawaiId' => $pegawaiId ?: $userProfile['id'],
+            'nip' => $nip ?: $userProfile['nip'],
+            'nama' => $nama ?: $userProfile['nama'],
+            'jabatan' => $jabatan,
+            'divisi' => $divisi,
+            'masaKerja' => $masaKerja,
+            'alamatCuti' => $alamatCuti,
+            'noTelpCuti' => $noTelpCuti,
+            'tanggalPengajuan' => $todayStr,
+            'tanggalMulai' => $tglMulaiFmt,
+            'tanggalAkhir' => $tglAkhirFmt,
+            'jumlahHari' => $diffDays,
+            'jatahTahun' => '2026',
+            'jenisCuti' => $jenisCuti,
+            'alasan' => $alasan,
+            'status' => 'dalam_proses',
+            'statusLabel' => 'Dalam Proses (Silahkan Ikuti Alur)',
+            'catatanCuti' => $detail['catatanCuti'],
+            'atasanLangsung' => $detail['atasanLangsung'],
+            'pejabatBerwenang' => $detail['pejabatBerwenang'],
+            'verifikasi' => $detail['verifikasi']
+        ];
+
+        jsonResponse([
+            'success' => true,
+            'message' => 'Pengajuan cuti berhasil dibuat dan berstatus DALAM PROSES! Silahkan cetak formulir resmi dan ikuti alur verifikasi kepegawaian.',
+            'data' => $newRow
+        ], 201);
+    }
+
+    // 3. POST /api/cuti/:id/verify OR /api/cuti/:id/selesaikan
+    if ($method === 'POST' && !empty($actionId) && ($subAction === 'verify' || $subAction === 'selesaikan')) {
+        $body = getJsonBody();
+        $action = trim($body['action'] ?? 'approve');
+        $catatan = trim($body['catatan'] ?? 'Disetujui oleh Petugas Kepegawaian.');
+        $verifikatorUser = $body['verifikatorUser'] ?? [];
+
+        if (!$pdo) jsonResponse(['success' => false, 'message' => 'Database tidak aktif'], 500);
+
+        $stmt = $pdo->prepare("SELECT * FROM tb_cuti WHERE cuti_code = ? OR id = ? LIMIT 1");
+        $stmt->execute([$actionId, $actionId]);
+        $cutiRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$cutiRow) {
+            jsonResponse(['success' => false, 'message' => 'Data cuti tidak ditemukan'], 404);
+        }
+
+        $nowStr = date('d-m-Y H:i');
+        $newStatus = ($action === 'reject' || $action === 'tolak') ? 'ditolak' : 'disetujui';
+        $newStatusLabel = ($newStatus === 'disetujui') ? 'Disetujui / Selesai (Di-ACC Petugas)' : 'Ditolak Petugas';
+
+        // Update detail_json
+        $detail = !empty($cutiRow['detail_json']) ? (json_decode($cutiRow['detail_json'], true) ?: []) : [];
+        $detail['verifikasi']['tahap1']['status'] = $newStatus;
+        $detail['verifikasi']['tahap1']['tanggal'] = $nowStr;
+        $detail['verifikasi']['tahap1']['catatan'] = $catatan;
+        $detail['verifikasi']['tahap2']['status'] = $newStatus;
+        $detail['verifikasi']['tahap2']['tanggal'] = $nowStr;
+        $detail['verifikasi']['tahap2']['catatan'] = $catatan;
+
+        // If approved and Tahunan, deduct quota in tb_pegawai
+        if ($newStatus === 'disetujui' && ($cutiRow['jenis_cuti'] === 'Tahunan')) {
+            $days = (int)$cutiRow['jumlah_hari'];
+            try {
+                $upd = $pdo->prepare("UPDATE tb_pegawai SET sisa_cuti = MAX(0, sisa_cuti - ?), cuti_terpakai = cuti_terpakai + ? WHERE nip = ? OR pegawai_id = ?");
+                $upd->execute([$days, $days, $cutiRow['nip'], $cutiRow['pegawai_id']]);
+            } catch (\Throwable $e) {}
+        }
+
+        $updCuti = $pdo->prepare("UPDATE tb_cuti SET 
+            status = ?, status_label = ?, 
+            verif_1_status = ?, verif_1_tanggal = ?, verif_1_catatan = ?,
+            verif_2_status = ?, verif_2_tanggal = ?, verif_2_catatan = ?,
+            detail_json = ?
+            WHERE id = ? OR cuti_code = ?");
+        $updCuti->execute([
+            $newStatus, $newStatusLabel,
+            $newStatus, $nowStr, $catatan,
+            $newStatus, $nowStr, $catatan,
+            json_encode($detail, JSON_UNESCAPED_UNICODE),
+            $cutiRow['id'], $cutiRow['cuti_code']
+        ]);
+
+        $cutiRow['status'] = $newStatus;
+        $cutiRow['status_label'] = $newStatusLabel;
+        $cutiRow['verif_1_status'] = $newStatus;
+        $cutiRow['verif_1_tanggal'] = $nowStr;
+        $cutiRow['verif_1_catatan'] = $catatan;
+        $cutiRow['verif_2_status'] = $newStatus;
+        $cutiRow['verif_2_tanggal'] = $nowStr;
+        $cutiRow['verif_2_catatan'] = $catatan;
+        $cutiRow['detail_json'] = json_encode($detail, JSON_UNESCAPED_UNICODE);
+
+        jsonResponse([
+            'success' => true,
+            'message' => ($newStatus === 'disetujui') 
+                ? 'Permohonan cuti berhasil di-ACC / disetujui! Kuota cuti pegawai otomatis terpotong sistem.' 
+                : 'Permohonan cuti telah ditolak.',
+            'data' => $formatRow($cutiRow)
+        ]);
+    }
+
+    // 4. DELETE /api/cuti/:id
+    if ($method === 'DELETE' && !empty($actionId)) {
+        if (!$pdo) jsonResponse(['success' => false, 'message' => 'Database tidak aktif'], 500);
+
+        $stmt = $pdo->prepare("SELECT * FROM tb_cuti WHERE cuti_code = ? OR id = ? LIMIT 1");
+        $stmt->execute([$actionId, $actionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) jsonResponse(['success' => false, 'message' => 'Data cuti tidak ditemukan'], 404);
+
+        if ($row['status'] === 'disetujui') {
+            jsonResponse(['success' => false, 'message' => 'Pengajuan cuti yang sudah di-ACC / disetujui tidak dapat dibatalkan langsung'], 400);
+        }
+
+        $del = $pdo->prepare("DELETE FROM tb_cuti WHERE id = ? OR cuti_code = ?");
+        $del->execute([$row['id'], $row['cuti_code']]);
+
+        jsonResponse(['success' => true, 'message' => 'Pengajuan cuti berhasil dibatalkan']);
     }
 }
 

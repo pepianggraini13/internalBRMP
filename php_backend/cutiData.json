@@ -1,0 +1,84 @@
+[
+    {
+        "id": "CUTI-2025-002",
+        "no": 2,
+        "pegawaiId": "PEG-001",
+        "nip": "198808062014032001",
+        "nama": "Agnita Verdiani Putri, A.Md",
+        "jabatan": "Pegawai BRMP DIY",
+        "divisi": "Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta",
+        "masaKerja": "",
+        "alamatCuti": "Solo, Jawa Tengah",
+        "noTelpCuti": "08123456789",
+        "tanggalPengajuan": "29-10-2026",
+        "tanggalMulai": "2026-11-02",
+        "tanggalAkhir": "2026-11-03",
+        "jumlahHari": 1,
+        "jatahTahun": "2026",
+        "jenisCuti": "Tahunan",
+        "alasan": "Acara keluarga di Solo",
+        "status": "dalam_proses",
+        "statusLabel": "Dalam Proses (Silahkan Ikuti Alur)",
+        "sisaCutiN": 12,
+        "sisaCutiN1": 0,
+        "sisaCuti": 12,
+        "verifikasi": {
+            "tahap1": {
+                "roleRequired": "verifikator_1",
+                "label": "Verifikasi 1: Atasan Langsung \/ Ketimker",
+                "status": "menunggu",
+                "verifikatorNama": "-",
+                "verifikatorNip": "-",
+                "tanggal": null,
+                "catatan": ""
+            },
+            "tahap2": {
+                "roleRequired": "verifikator_2",
+                "label": "Verifikasi 2: Kepala Bagian TU (Final)",
+                "status": "menunggu",
+                "verifikatorNama": "-",
+                "verifikatorNip": "-",
+                "tanggal": null,
+                "catatan": ""
+            }
+        }
+    },
+    {
+        "id": "CUTI-2026-001",
+        "no": 1,
+        "pegawaiId": "PEG-001",
+        "nip": "198808062014032001",
+        "nama": "Agnita Verdiani Putri, A.Md",
+        "jabatan": "Pegawai BRMP DIY",
+        "divisi": "Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta",
+        "tanggalPengajuan": "29-10-2026",
+        "tanggalMulai": "30-10-2026",
+        "tanggalAkhir": "30-10-2026",
+        "jumlahHari": 1,
+        "jatahTahun": "2026",
+        "jenisCuti": "Tahunan",
+        "alasan": "Urusan keluarga",
+        "status": "dalam_proses",
+        "statusLabel": "Dalam Proses (Silahkan Ikuti Alur)",
+        "verifikasi": {
+            "tahap1": {
+                "roleRequired": "verifikator_1",
+                "label": "Verifikasi 1: Atasan Langsung \/ Ketimker",
+                "status": "menunggu",
+                "verifikatorNama": null,
+                "verifikatorNip": null,
+                "tanggal": null,
+                "catatan": null
+            },
+            "tahap2": {
+                "roleRequired": "verifikator_2",
+                "label": "Verifikasi 2: Kepala Bagian TU (Final)",
+                "status": "menunggu",
+                "verifikatorNama": null,
+                "verifikatorNip": null,
+                "tanggal": null,
+                "catatan": null
+            }
+        }
+    }
+]

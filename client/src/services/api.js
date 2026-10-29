@@ -332,6 +332,22 @@ export const apiService = {
     }
   },
 
+  async selesaikanCuti(id, verifikatorUser, catatan = '') {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cuti/${id}/selesaikan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verifikatorUser, catatan })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      return data;
+    } catch (err) {
+      console.warn('Selesaikan cuti error:', err.message);
+      throw err;
+    }
+  },
+
   async cancelCuti(id) {
     try {
       const res = await fetch(`${API_BASE_URL}/cuti/${id}`, {
@@ -395,11 +411,12 @@ export const apiService = {
     }
   },
 
-  async getAdmsLogs(nip = '', role = '') {
+  async getAdmsLogs(nip = '', role = '', date = 'all') {
     try {
       const params = new URLSearchParams();
       if (nip) params.append('nip', nip);
       if (role) params.append('role', role);
+      if (date) params.append('date', date);
       const qs = params.toString() ? `?${params.toString()}` : '';
       const res = await fetch(`${API_BASE_URL}/adms/api/logs${qs}`);
       const data = await res.json();

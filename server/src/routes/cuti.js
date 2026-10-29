@@ -20,11 +20,8 @@ router.get('/', (req, res) => {
     myHistory = cutiHistory.filter(c => c.nip === user.nip || String(c.pegawaiId) === String(user.id));
   }
 
-  // Antrean untuk Verifikator 1 (Atasan Langsung)
-  const pendingVerif1 = cutiHistory.filter(c => c.status === 'menunggu_verif_1');
-
-  // Antrean untuk Verifikator 2 (Kepala TU / Balai)
-  const pendingVerif2 = cutiHistory.filter(c => c.status === 'menunggu_verif_2');
+  // Antrean antrean
+  const pendingCuti = cutiHistory.filter(c => c.status === 'dalam_proses' || c.status.startsWith('menunggu'));
 
   res.json({
     success: true,
@@ -38,10 +35,15 @@ router.get('/', (req, res) => {
         systemRole: user.systemRole,
         approvalRole: user.approvalRole,
         roleLabel: user.roleLabel,
-        sisaCuti: user.sisaCuti,
+        sisaCuti: (Number(user.sisaCutiN) || 0) + (Number(user.sisaCutiN1) || 0),
+        sisaCutiN: user.sisaCutiN !== undefined ? Number(user.sisaCutiN) : 12,
+        sisaCutiN1: user.sisaCutiN1 !== undefined ? Number(user.sisaCutiN1) : 0,
         cutiTerpakai: user.cutiTerpakai || 0,
-        expiredCuti: user.expiredCuti,
-        sisaCutiText: `2025 - Sisa ${user.sisaCuti} Hari - Expired ${user.expiredCuti}`
+        expiredCuti: user.expiredCuti || "31-12-2026",
+        masaKerja: user.masaKerja || "01 Tahun 03 Bulan",
+        alamat: user.alamat || "Yogyakarta",
+        noHp: user.noHp || "085268238966",
+        sisaCutiText: `2026 - Total Sisa ${(Number(user.sisaCutiN) || 0) + (Number(user.sisaCutiN1) || 0)} Hari (N-1: ${user.sisaCutiN1 || 0} Hari, N: ${user.sisaCutiN || 12} Hari)`
       },
       jenisCutiOptions: [
         "Tahunan",
@@ -54,12 +56,14 @@ router.get('/', (req, res) => {
       ],
       history: cutiHistory, // Semua history untuk verifikator & admin
       myHistory: myHistory, // History khusus pegawai yang sedang login
-      pendingVerif1,
-      pendingVerif2,
+      pendingVerif1: pendingCuti,
+      pendingVerif2: pendingCuti,
+      pendingCuti,
       summary: {
         totalPengajuan: cutiHistory.length,
-        menungguVerif1: pendingVerif1.length,
-        menungguVerif2: pendingVerif2.length,
+        dalamProses: pendingCuti.length,
+        menungguVerif1: pendingCuti.length,
+        menungguVerif2: 0,
         disetujui: cutiHistory.filter(c => c.status === 'disetujui').length,
         ditolak: cutiHistory.filter(c => c.status.startsWith('ditolak')).length
       }
@@ -78,7 +82,10 @@ router.post('/', (req, res) => {
     jenisCuti, 
     tanggalMulai, 
     tanggalAkhir, 
-    alasan 
+    alasan,
+    alamatCuti,
+    noTelpCuti,
+    masaKerja
   } = req.body;
 
   if (!jenisCuti || !tanggalMulai || !tanggalAkhir || !alasan) {
@@ -117,12 +124,13 @@ router.post('/', (req, res) => {
 
   // Find user data
   const user = users.find(u => u.nip === nip || String(u.id) === String(pegawaiId)) || users[1];
+  const totalSisa = (Number(user.sisaCutiN) || 0) + (Number(user.sisaCutiN1) || 0);
 
   // Check sisa cuti if Tahunan
-  if (jenisCuti === 'Tahunan' && user.sisaCuti < diffDays) {
+  if (jenisCuti === 'Tahunan' && totalSisa < diffDays) {
     return res.status(400).json({
       success: false,
-      message: `Sisa kuota cuti tahunan tidak mencukupi (Tersisa: ${user.sisaCuti} hari, Pengajuan: ${diffDays} hari)`
+      message: `Total sisa kuota cuti tahunan tidak mencukupi (Tersisa: ${totalSisa} hari, Pengajuan: ${diffDays} hari)`
     });
   }
 
@@ -136,31 +144,27 @@ router.post('/', (req, res) => {
     tanggalMulai: formatDate(tanggalMulai),
     tanggalAkhir: formatDate(tanggalAkhir),
     jumlahHari: diffDays,
-    jatahTahun: "2025",
+    jatahTahun: "2026",
     jenisCuti,
-    alasan
+    alasan,
+    alamatCuti: alamatCuti || user.alamat || "Yogyakarta",
+    noTelpCuti: noTelpCuti || user.noHp || "085268238966",
+    masaKerja: masaKerja || user.masaKerja || "01 Tahun 03 Bulan"
   });
 
   res.status(201).json({
     success: true,
-    message: 'Pengajuan cuti berhasil diajukan! Menunggu Verifikasi Tahap 1 dari Atasan Langsung.',
+    message: 'Pengajuan cuti berhasil dibuat dan berstatus DALAM PROSES! Silahkan ikuti alur pengajuan cuti (cetak formulir, mintakan tanda tangan atasan, lalu serahkan ke petugas untuk di-ACC).',
     data: newCuti
   });
 });
 
-// POST /api/cuti/:id/verify - Verifikasi 2 tahap oleh Verifikator 1 atau Verifikator 2
+// POST /api/cuti/:id/verify - Verifikasi & Selesaikan Alur oleh Petugas Kepegawaian (Memotong Kuota Sistem)
 router.post('/:id/verify', (req, res) => {
   const { id } = req.params;
-  const { tahap, action, verifikatorUser, catatan } = req.body;
+  const { tahap = 'selesai', action = 'approve', verifikatorUser, catatan } = req.body;
 
-  if (!tahap || !action || !['approve', 'reject'].includes(action)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Parameter tahap (1 atau 2) dan action (approve atau reject) wajib diisi'
-    });
-  }
-
-  const result = verifyCuti(id, parseInt(tahap, 10), {
+  const result = verifyCuti(id, tahap, {
     action,
     verifikatorUser,
     catatan
@@ -170,18 +174,36 @@ router.post('/:id/verify', (req, res) => {
     return res.status(400).json(result);
   }
 
-  const actionText = action === 'approve' 
-    ? (tahap === 2 ? 'disetujui secara FINAL' : 'disetujui dan diteruskan ke Verifikasi Tahap 2') 
-    : 'ditolak';
-
   res.json({
     success: true,
-    message: `Pengajuan cuti berhasil ${actionText}`,
+    message: result.message,
     data: result.data
   });
 });
 
-// DELETE /api/cuti/:id - Pembatalan cuti oleh pemohon jika belum diverifikasi
+// POST /api/cuti/:id/selesaikan - Route eksplisit penyelesaian alur oleh Petugas
+router.post('/:id/selesaikan', (req, res) => {
+  const { id } = req.params;
+  const { verifikatorUser, catatan } = req.body;
+
+  const result = verifyCuti(id, 'selesai', {
+    action: 'acc',
+    verifikatorUser,
+    catatan
+  });
+
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+
+  res.json({
+    success: true,
+    message: result.message,
+    data: result.data
+  });
+});
+
+// DELETE /api/cuti/:id - Pembatalan cuti oleh pemohon jika masih dalam proses
 router.delete('/:id', (req, res) => {
   const { id } = req.params;
   const index = cutiHistory.findIndex(c => c.id === id);
@@ -190,10 +212,10 @@ router.delete('/:id', (req, res) => {
     return res.status(404).json({ success: false, message: 'Data cuti tidak ditemukan' });
   }
 
-  if (cutiHistory[index].status !== 'menunggu_verif_1') {
+  if (cutiHistory[index].status === 'disetujui') {
     return res.status(400).json({ 
       success: false, 
-      message: 'Hanya pengajuan cuti berstatus "Menunggu Verifikasi 1" yang dapat dibatalkan' 
+      message: 'Pengajuan cuti yang sudah di-ACC / disetujui tidak dapat dibatalkan langsung' 
     });
   }
 

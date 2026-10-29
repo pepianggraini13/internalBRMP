@@ -5,7 +5,7 @@
 
 @page {
   size: A4 portrait;
-  margin: 15mm 20mm 15mm 20mm;
+  margin: 10mm 15mm 10mm 15mm;
 }
 
 @media print {
@@ -29,8 +29,11 @@
   .app-header,
   .top-banner,
   .role-switcher-bar,
-  .main-content,
-  .modal-overlay:not(#previewModal),
+  .breadcrumb-banner,
+  .cuti-tabs-nav,
+  .brmp-card,
+  .brmp-table,
+  .bkn-control-bar,
   .no-print,
   button,
   .btn,
@@ -40,7 +43,103 @@
     display: none !important;
   }
 
-  /* Tampilan cetak dari modal preview */
+  /* Main content harus tetap terlihat agar modal atau halaman cetak SPT umum muncul */
+  .main-content {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Isolasi Cetak Formulir Cuti BKN Resmi: Sembunyikan #root agar tidak memakan lembar pertama */
+  body.bkn-print-active {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.bkn-print-active #root,
+  body.bkn-print-active .main-content,
+  body.bkn-print-active > *:not(.bkn-modal-overlay) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Tampilan cetak Formulir Permintaan dan Pemberian Cuti BKN (Pas 1 Lembar A4) */
+  body.bkn-print-active .bkn-modal-overlay {
+    position: static !important;
+    display: block !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    inset: auto !important;
+    z-index: auto !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  body.bkn-print-active .bkn-sheet-container {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.bkn-print-active .bkn-a4-page {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-family: "Bookman Old Style", "Times New Roman", Georgia, serif !important;
+    font-size: 7.8pt !important;
+    line-height: 1.25 !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  body.bkn-print-active .bkn-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 3px !important;
+    font-size: 7.5pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  body.bkn-print-active .bkn-table th, 
+  body.bkn-print-active .bkn-table td {
+    border: 1px solid #000000 !important;
+    padding: 1.5px 3.5px !important;
+    color: #000000 !important;
+  }
+
+  body.bkn-print-active .bkn-table th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+  }
+
+  /* Tampilan cetak dari modal preview SPT */
   #previewModal {
     display: block !important;
     position: static !important;

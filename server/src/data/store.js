@@ -73,8 +73,9 @@ export const updateUserRole = (userId, { systemRole, approvalRole, pinMesin }) =
     if (approvalRole) {
       users[index].approvalRole = approvalRole;
       if (approvalRole === 'admin') users[index].roleLabel = 'Administrator Kepegawaian';
-      else if (approvalRole === 'verifikator_1') users[index].roleLabel = 'Verifikator 1 (Ketua Tim Kerja)';
-      else if (approvalRole === 'verifikator_2') users[index].roleLabel = 'Verifikator 2 (Kepala Bagian TU)';
+      else if (approvalRole === 'kepegawaian') users[index].roleLabel = 'Petugas Kepegawaian (ACC Cuti)';
+      else if (approvalRole === 'verifikator_1') users[index].roleLabel = 'Petugas Kepegawaian (ACC Cuti)';
+      else if (approvalRole === 'verifikator_2') users[index].roleLabel = 'Petugas Kepegawaian (ACC Cuti)';
       else users[index].roleLabel = 'Pegawai (Pemohon Cuti)';
     }
 
@@ -299,82 +300,142 @@ export const yearlyChartData = {
   ]
 };
 
-// Cuti History with 2-Stage Verification Workflow:
-// Status: 'menunggu_verif_1' -> 'menunggu_verif_2' -> 'disetujui' (or 'ditolak_verif_1' / 'ditolak_verif_2')
+// Normalize 2-year leave quotas (N and N-1) for all employees
+users.forEach(u => {
+  if (u.sisaCutiN === undefined) {
+    u.sisaCutiN = u.sisaCuti !== undefined ? Math.min(12, Number(u.sisaCuti)) : 12;
+  }
+  if (u.sisaCutiN1 === undefined) {
+    u.sisaCutiN1 = u.sisaCuti !== undefined && Number(u.sisaCuti) > 12 ? Number(u.sisaCuti) - 12 : 0;
+  }
+  u.sisaCuti = (Number(u.sisaCutiN) || 0) + (Number(u.sisaCutiN1) || 0);
+  u.cutiTerpakai = Number(u.cutiTerpakai) || 0;
+  if (!u.masaKerja) u.masaKerja = "01 Tahun 03 Bulan";
+  if (!u.alamat) u.alamat = "Yogyakarta";
+  if (!u.noHp) u.noHp = "085268238966";
+});
+
+// Cuti History with 2-Year Quota & Workflow
 export let cutiHistory = [
   {
-    id: "CUTI-2025-001",
+    id: "CUTI-2026-001",
     no: 1,
     pegawaiId: "PEG-001",
     nip: "199808062014032001",
     nama: "AGNITA VERDIANI PUTRI, A.Md.",
     jabatan: "Pengelola Standardisasi Teknis",
-    divisi: "Balai Penerapan Standar Instrumen Pertanian DIY",
-    tanggalPengajuan: "12-06-2025",
-    tanggalMulai: "16-06-2025",
-    tanggalAkhir: "17-06-2025",
+    divisi: "Balai Penerapan Modernisasi Pertanian DIY",
+    masaKerja: "02 Tahun 04 Bulan",
+    alamatCuti: "Jl. Kaliurang Km 9, Sleman, D.I. Yogyakarta",
+    noTelpCuti: "081234567890",
+    tanggalPengajuan: "05-08-2026",
+    tanggalMulai: "10-08-2026",
+    tanggalAkhir: "11-08-2026",
     jumlahHari: 2,
-    jatahTahun: "2025",
+    jatahTahun: "2026",
     jenisCuti: "Tahunan",
     alasan: "Keperluan keluarga di luar kota",
-    status: "menunggu_verif_1",
-    statusLabel: "Menunggu Verifikasi 1 (Atasan Langsung)",
+    status: "dalam_proses",
+    statusLabel: "Dalam Proses (Silahkan Ikuti Alur)",
+    catatanCuti: {
+      n2: 0,
+      n1: 2,
+      n: 12,
+      keteranganN2: "-",
+      keteranganN1: "Sisa 2 hari",
+      keteranganN: "Sisa 12 hari"
+    },
+    atasanLangsung: {
+      nama: "Agung Ariyanto, SEI, M.Ec.Dev",
+      nip: "198101312009121004",
+      jabatan: "Ketua Tim Kerja SDM / Atasan Langsung",
+      keputusan: "DISETUJUI"
+    },
+    pejabatBerwenang: {
+      nama: "Dr. Soeharsono, S.Pt, M.Si",
+      nip: "197109271998031002",
+      jabatan: "Kepala Balai Besar Penerapan Modernisasi Pertanian",
+      keputusan: "DISETUJUI"
+    },
     verifikasi: {
       tahap1: {
         roleRequired: "verifikator_1",
-        label: "Verifikasi 1: Atasan Langsung / Ketimker",
-        status: "menunggu", // 'menunggu' | 'disetujui' | 'ditolak'
-        verifikatorNama: "Dwi Dinia Rahayu, S.Kom, M.T.I",
-        verifikatorNip: "198604092011012024",
+        label: "Pertimbangan Atasan Langsung",
+        status: "dalam_proses",
+        verifikatorNama: "Agung Ariyanto, SEI, M.Ec.Dev",
+        verifikatorNip: "198101312009121004",
         tanggal: null,
-        catatan: ""
+        catatan: "Menunggu paraf berkas cetak fisik"
       },
       tahap2: {
         roleRequired: "verifikator_2",
-        label: "Verifikasi 2: Kepala Bagian TU (Final)",
-        status: "menunggu", // 'menunggu' | 'disetujui' | 'ditolak'
-        verifikatorNama: "Agung Ariyanto, SEI., M.Ec., Dev.",
-        verifikatorNip: "198101312009121004",
+        label: "Penyelesaian Petugas Kepegawaian",
+        status: "dalam_proses",
+        verifikatorNama: "Dr. Soeharsono, S.Pt, M.Si",
+        verifikatorNip: "197109271998031002",
         tanggal: null,
-        catatan: ""
+        catatan: "Menunggu penyelesaian alur oleh petugas"
       }
     }
   },
   {
-    id: "CUTI-2025-002",
+    id: "CUTI-2026-002",
     no: 2,
     pegawaiId: "PEG-004",
-    nip: "198906012015032004",
-    nama: "Devi Eka Nuvitasari, S.H.",
-    jabatan: "Penelaah Teknis Kebijakan",
+    nip: "200110162025052005",
+    nama: "Oktin Dyah Sekar Wangi S.Si.",
+    jabatan: "Analis Pemanfaatan Ilmu dan Pengetahuan Teknologi Ahli Pertama",
     divisi: "Tim Kerja Pengelolaan Sumber Daya Manusia",
-    tanggalPengajuan: "05-06-2025",
-    tanggalMulai: "09-06-2025",
-    tanggalAkhir: "10-06-2025",
+    masaKerja: "01 Tahun 03 Bulan",
+    alamatCuti: "Jakarta",
+    noTelpCuti: "085268238966",
+    tanggalPengajuan: "05-08-2026",
+    tanggalMulai: "03-08-2026",
+    tanggalAkhir: "04-08-2026",
     jumlahHari: 2,
-    jatahTahun: "2025",
-    jenisCuti: "Tahunan",
-    alasan: "Menghadiri wisuda anggota keluarga",
-    status: "menunggu_verif_2",
-    statusLabel: "Menunggu Verifikasi 2 (Kepala TU / Balai)",
+    jatahTahun: "2026",
+    jenisCuti: "Sakit",
+    alasan: "Sakit",
+    status: "disetujui",
+    statusLabel: "Disetujui / Selesai (Di-ACC Petugas)",
+    catatanCuti: {
+      n2: 0,
+      n1: 0,
+      n: 10,
+      keteranganN2: "-",
+      keteranganN1: "0 hari",
+      keteranganN: "10 hari"
+    },
+    atasanLangsung: {
+      nama: "Agung Ariyanto, SEI, M.Ec.Dev",
+      nip: "198101312009121004",
+      jabatan: "Ketua Tim Kerja SDM / Atasan Langsung",
+      keputusan: "DISETUJUI"
+    },
+    pejabatBerwenang: {
+      nama: "Dr. Soeharsono, S.Pt, M.Si",
+      nip: "197109271998031002",
+      jabatan: "Kepala Balai Besar Penerapan Modernisasi Pertanian",
+      keputusan: "DISETUJUI"
+    },
     verifikasi: {
       tahap1: {
         roleRequired: "verifikator_1",
-        label: "Verifikasi 1: Atasan Langsung / Ketimker",
+        label: "Pertimbangan Atasan Langsung",
         status: "disetujui",
-        verifikatorNama: "Dwi Dinia Rahayu, S.Kom, M.T.I",
-        verifikatorNip: "198604092011012024",
-        tanggal: "06-06-2025 09:30",
-        catatan: "Disetujui. Koordinasi tugas pengganti sudah siap."
+        verifikatorNama: "Agung Ariyanto, SEI, M.Ec.Dev",
+        verifikatorNip: "198101312009121004",
+        tanggal: "05-08-2026 10:00",
+        catatan: "Disetujui. Surat keterangan dokter terlampir."
       },
       tahap2: {
         roleRequired: "verifikator_2",
-        label: "Verifikasi 2: Kepala Bagian TU (Final)",
-        status: "menunggu",
-        verifikatorNama: "Agung Ariyanto, SEI., M.Ec., Dev.",
-        verifikatorNip: "198101312009121004",
-        tanggal: null,
-        catatan: ""
+        label: "Penyelesaian Petugas Kepegawaian",
+        status: "disetujui",
+        verifikatorNama: "Dr. Soeharsono, S.Pt, M.Si",
+        verifikatorNip: "197109271998031002",
+        tanggal: "05-08-2026 13:30",
+        catatan: "Disahkan dan disetujui lengkap oleh Petugas Kepegawaian."
       }
     }
   }
@@ -382,32 +443,57 @@ export let cutiHistory = [
 
 export const addCuti = (cutiItem) => {
   const newNum = cutiHistory.length + 1;
-  const newId = `CUTI-2025-${String(newNum).padStart(3, '0')}`;
+  const newId = `CUTI-2026-${String(newNum).padStart(3, '0')}`;
+
+  const user = users.find(u => u.nip === cutiItem.nip || String(u.id) === String(cutiItem.pegawaiId));
 
   const newItem = {
     id: newId,
     no: newNum,
     ...cutiItem,
-    status: "menunggu_verif_1",
-    statusLabel: "Menunggu Verifikasi 1 (Atasan Langsung)",
+    status: "dalam_proses",
+    statusLabel: "Dalam Proses (Silahkan Ikuti Alur)",
+    catatanCuti: {
+      n2: 0,
+      n1: user?.sisaCutiN1 !== undefined ? user.sisaCutiN1 : 0,
+      n: user?.sisaCutiN !== undefined ? user.sisaCutiN : (user?.sisaCuti || 12),
+      keteranganN2: "-",
+      keteranganN1: `${user?.sisaCutiN1 || 0} hari`,
+      keteranganN: `${user?.sisaCutiN !== undefined ? user.sisaCutiN : (user?.sisaCuti || 12)} hari`
+    },
+    alamatCuti: cutiItem.alamatCuti || user?.alamat || "Yogyakarta",
+    noTelpCuti: cutiItem.noTelpCuti || user?.noHp || "08123456789",
+    masaKerja: cutiItem.masaKerja || user?.masaKerja || "01 Tahun 03 Bulan",
+    atasanLangsung: {
+      nama: "Agung Ariyanto, SEI, M.Ec.Dev",
+      nip: "198101312009121004",
+      jabatan: "Ketua Tim Kerja SDM / Atasan Langsung",
+      keputusan: "DISETUJUI"
+    },
+    pejabatBerwenang: {
+      nama: "Dr. Soeharsono, S.Pt, M.Si",
+      nip: "197109271998031002",
+      jabatan: "Kepala Balai Besar Penerapan Modernisasi Pertanian",
+      keputusan: "DISETUJUI"
+    },
     verifikasi: {
       tahap1: {
         roleRequired: "verifikator_1",
-        label: "Verifikasi 1: Atasan Langsung / Ketimker",
-        status: "menunggu",
-        verifikatorNama: "-",
-        verifikatorNip: "-",
+        label: "Pertimbangan Atasan Langsung",
+        status: "dalam_proses",
+        verifikatorNama: "Agung Ariyanto, SEI, M.Ec.Dev",
+        verifikatorNip: "198101312009121004",
         tanggal: null,
-        catatan: ""
+        catatan: "Menunggu paraf pertimbangan atasan pada formulir cetak"
       },
       tahap2: {
         roleRequired: "verifikator_2",
-        label: "Verifikasi 2: Kepala Bagian TU (Final)",
-        status: "menunggu",
-        verifikatorNama: "-",
-        verifikatorNip: "-",
+        label: "Penyelesaian Petugas Kepegawaian",
+        status: "dalam_proses",
+        verifikatorNama: "Dr. Soeharsono, S.Pt, M.Si",
+        verifikatorNip: "197109271998031002",
         tanggal: null,
-        catatan: ""
+        catatan: "Menunggu penyelesaian alur oleh petugas kepegawaian"
       }
     }
   };
@@ -422,66 +508,88 @@ export const verifyCuti = (id, tahap, { action, verifikatorUser, catatan = '' })
   const now = new Date();
   const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-  if (tahap === 1) {
-    if (action === 'approve') {
-      item.verifikasi.tahap1.status = 'disetujui';
-      item.verifikasi.tahap1.tanggal = dateStr;
-      item.verifikasi.tahap1.verifikatorNama = verifikatorUser?.nama || 'Verifikator 1';
-      item.verifikasi.tahap1.verifikatorNip = verifikatorUser?.nip || '-';
-      item.verifikasi.tahap1.catatan = catatan || 'Disetujui oleh Atasan Langsung';
-
-      // Maju ke tahap 2
-      item.status = 'menunggu_verif_2';
-      item.statusLabel = 'Menunggu Verifikasi 2 (Kepala TU / Balai)';
-    } else {
-      item.verifikasi.tahap1.status = 'ditolak';
-      item.verifikasi.tahap1.tanggal = dateStr;
-      item.verifikasi.tahap1.verifikatorNama = verifikatorUser?.nama || 'Verifikator 1';
-      item.verifikasi.tahap1.verifikatorNip = verifikatorUser?.nip || '-';
-      item.verifikasi.tahap1.catatan = catatan || 'Pengajuan ditolak pada verifikasi tahap 1';
-
-      item.status = 'ditolak_verif_1';
-      item.statusLabel = 'Ditolak oleh Verifikator 1';
-    }
-    return { success: true, data: item };
+  // Penolakan
+  if (action === 'reject') {
+    item.status = 'ditolak';
+    item.statusLabel = 'Ditolak Petugas';
+    item.verifikasi.tahap2.status = 'ditolak';
+    item.verifikasi.tahap2.tanggal = dateStr;
+    item.verifikasi.tahap2.verifikatorNama = verifikatorUser?.nama || 'Petugas Kepegawaian';
+    item.verifikasi.tahap2.verifikatorNip = verifikatorUser?.nip || '-';
+    item.verifikasi.tahap2.catatan = catatan || 'Pengajuan cuti ditolak';
+    return { success: true, message: 'Pengajuan cuti berhasil ditolak', data: item };
   }
 
-  if (tahap === 2) {
-    if (item.status !== 'menunggu_verif_2') {
-      return { success: false, message: 'Pengajuan cuti ini belum disetujui pada Verifikasi Tahap 1' };
+  // ACC / Penyelesaian Alur oleh Petugas (memotong kuota sistem)
+  if (action === 'approve' || action === 'acc' || tahap === 2 || tahap === 'selesai' || tahap === 1) {
+    if (item.status === 'disetujui') {
+      return { success: true, message: 'Pengajuan cuti ini sudah disetujui sebelumnya', data: item };
     }
 
-    if (action === 'approve') {
-      item.verifikasi.tahap2.status = 'disetujui';
-      item.verifikasi.tahap2.tanggal = dateStr;
-      item.verifikasi.tahap2.verifikatorNama = verifikatorUser?.nama || 'Verifikator 2';
-      item.verifikasi.tahap2.verifikatorNip = verifikatorUser?.nip || '-';
-      item.verifikasi.tahap2.catatan = catatan || 'Disetujui secara final oleh Kepala Bagian TU';
+    item.status = 'disetujui';
+    item.statusLabel = 'Disetujui / Selesai (Di-ACC Petugas)';
+    item.verifikasi.tahap1.status = 'disetujui';
+    item.verifikasi.tahap1.tanggal = item.verifikasi.tahap1.tanggal || dateStr;
+    item.verifikasi.tahap2.status = 'disetujui';
+    item.verifikasi.tahap2.tanggal = dateStr;
+    item.verifikasi.tahap2.verifikatorNama = verifikatorUser?.nama || 'Petugas Kepegawaian';
+    item.verifikasi.tahap2.verifikatorNip = verifikatorUser?.nip || '-';
+    item.verifikasi.tahap2.catatan = catatan || 'Alur cuti selesai dan disetujui petugas. Kuota cuti resmi terpotong.';
 
-      // Selesai disetujui final
-      item.status = 'disetujui';
-      item.statusLabel = 'Disetujui Lengkap (Final)';
+    // Potong kuota cuti pegawai secara otomatis dengan aturan FIFO (N-1 dulu, baru N) jika Cuti Tahunan
+    const peg = users.find(u => u.nip === item.nip || String(u.id) === String(item.pegawaiId));
+    if (peg && item.jenisCuti === 'Tahunan') {
+      const days = parseInt(item.jumlahHari, 10) || 1;
+      let sisaPotong = days;
+      let potongN1 = 0;
+      let potongN = 0;
 
-      // Potong sisa cuti pegawai jika cuti tahunan
-      const peg = users.find(u => u.nip === item.nip || String(u.id) === String(item.pegawaiId));
-      if (peg && item.jenisCuti === 'Tahunan') {
-        const days = parseInt(item.jumlahHari, 10) || 1;
-        peg.sisaCuti = Math.max(0, peg.sisaCuti - days);
-        peg.cutiTerpakai = (peg.cutiTerpakai || 0) + days;
+      const curN1 = peg.sisaCutiN1 !== undefined ? Number(peg.sisaCutiN1) : 0;
+      if (curN1 > 0) {
+        potongN1 = Math.min(sisaPotong, curN1);
+        peg.sisaCutiN1 = curN1 - potongN1;
+        sisaPotong -= potongN1;
       }
-    } else {
-      item.verifikasi.tahap2.status = 'ditolak';
-      item.verifikasi.tahap2.tanggal = dateStr;
-      item.verifikasi.tahap2.verifikatorNama = verifikatorUser?.nama || 'Verifikator 2';
-      item.verifikasi.tahap2.verifikatorNip = verifikatorUser?.nip || '-';
-      item.verifikasi.tahap2.catatan = catatan || 'Pengajuan ditolak pada verifikasi tahap 2';
 
-      item.status = 'ditolak_verif_2';
-      item.statusLabel = 'Ditolak oleh Verifikator 2 (Kepala TU)';
+      if (sisaPotong > 0) {
+        const curN = peg.sisaCutiN !== undefined ? Number(peg.sisaCutiN) : (peg.sisaCuti || 12);
+        potongN = Math.min(sisaPotong, curN);
+        peg.sisaCutiN = Math.max(0, curN - potongN);
+        sisaPotong -= potongN;
+      }
+
+      peg.sisaCuti = (peg.sisaCutiN || 0) + (peg.sisaCutiN1 || 0);
+      peg.cutiTerpakai = (peg.cutiTerpakai || 0) + days;
+
+      item.pemotongan = {
+        tanggal: dateStr,
+        petugasNama: verifikatorUser?.nama || 'Petugas Kepegawaian',
+        durasi: days,
+        potongN1,
+        potongN,
+        sisaCutiN1Baru: peg.sisaCutiN1,
+        sisaCutiNBaru: peg.sisaCutiN,
+        totalSisaBaru: peg.sisaCuti,
+        keterangan: `Dipotong ${potongN1} hari dari kuota tahun lalu (N-1) dan ${potongN} hari dari kuota tahun berjalan (N). Sisa cuti sekarang: ${peg.sisaCuti} hari.`
+      };
+
+      try {
+        fs.writeFileSync(pegawaiJsonPath, JSON.stringify(users, null, 2), 'utf8');
+      } catch (e) {
+        console.error('[Store] Failed saving updated pegawai sisa cuti:', e.message);
+      }
     }
-    return { success: true, data: item };
+
+    return { 
+      success: true, 
+      message: item.pemotongan 
+        ? `Pengajuan cuti berhasil di-ACC! ${item.pemotongan.keterangan}` 
+        : 'Pengajuan cuti berhasil di-ACC dan alur diselesaikan!', 
+      data: item 
+    };
   }
 
-  return { success: false, message: 'Tahap verifikasi tidak valid' };
+  return { success: false, message: 'Aksi tidak valid' };
 };
+
 

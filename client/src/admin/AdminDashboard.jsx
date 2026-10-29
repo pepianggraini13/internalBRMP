@@ -44,6 +44,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { apiService, getStoredAvatar, setStoredAvatar } from '../services/api';
+import CutiFormulirBkn from '../components/CutiFormulirBkn';
 import './AdminDashboard.css';
 
 // Helper initial mock cuti records for BRMP DIY
@@ -269,6 +270,7 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
   const [showCutiActionModal, setShowCutiActionModal] = useState(false);
   const [selectedCutiDetail, setSelectedCutiDetail] = useState(null);
   const [showCutiDetailModal, setShowCutiDetailModal] = useState(false);
+  const [selectedPrintCutiAdmin, setSelectedPrintCutiAdmin] = useState(null);
   const [actionLoadingCuti, setActionLoadingCuti] = useState(false);
   const [cutiAlert, setCutiAlert] = useState({ type: '', message: '' });
 
@@ -649,31 +651,32 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
           };
         }
 
-        // Approve Tahap 1
-        if (verifyTargetStage === '1' && item.status === 'menunggu_verif_1') {
-          return {
-            ...item,
-            status: 'menunggu_verif_2',
-            verifikasi1: {
-              approved: true,
-              verifikatorNama: 'Administrator (a.n. Ketua Tim Kerja)',
-              tanggal: nowStr,
-              catatan: verifyCatatan
-            }
-          };
-        }
-
-        // Approve Tahap 2 / Pengesahan Definitif
+        // Approve Tunggal oleh Kepegawaian (Langsung Disetujui & Potong Kuota Cuti)
         const isTahunan = item.jenisCuti === 'Tahunan';
         const durasi = Number(item.jumlahHari) || 0;
-        const currentQuota = item.sisaCuti !== undefined ? item.sisaCuti : 12;
-        const sisaBaru = isTahunan ? Math.max(0, currentQuota - durasi) : currentQuota;
+        
+        // 2-Year Quota Deduction Scheme (FIFO: N-1 prioritized first, then N)
+        let sisaN1Baru = item.sisaCutiN1 !== undefined ? item.sisaCutiN1 : 0;
+        let sisaNBaru = item.sisaCutiN !== undefined ? item.sisaCutiN : (item.sisaCuti !== undefined ? item.sisaCuti : 12);
+        
+        if (isTahunan) {
+          let sisaKebutuhan = durasi;
+          if (sisaN1Baru > 0) {
+            const potongN1 = Math.min(sisaKebutuhan, sisaN1Baru);
+            sisaN1Baru -= potongN1;
+            sisaKebutuhan -= potongN1;
+          }
+          if (sisaKebutuhan > 0) {
+            sisaNBaru = Math.max(0, sisaNBaru - sisaKebutuhan);
+          }
+        }
+        const sisaBaru = sisaN1Baru + sisaNBaru;
         const terpakaiBaru = (item.cutiTerpakai || 0) + (isTahunan ? durasi : 0);
 
         // Update employee quota in usersList and localStorage cache
         setUsersList(prev => prev.map(u => {
           if (u.nip === item.nip) {
-            return { ...u, sisaCuti: sisaBaru };
+            return { ...u, sisaCuti: sisaBaru, sisaCutiN: sisaNBaru, sisaCutiN1: sisaN1Baru };
           }
           return u;
         }));
@@ -682,7 +685,7 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
           const stored = localStorage.getItem('brmp_users_cache');
           if (stored) {
             const parsed = JSON.parse(stored);
-            const updated = parsed.map(u => u.nip === item.nip ? { ...u, sisaCuti: sisaBaru } : u);
+            const updated = parsed.map(u => u.nip === item.nip ? { ...u, sisaCuti: sisaBaru, sisaCutiN: sisaNBaru, sisaCutiN1: sisaN1Baru } : u);
             localStorage.setItem('brmp_users_cache', JSON.stringify(updated));
           }
         } catch (e) {}
@@ -691,18 +694,20 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
           ...item,
           status: 'disetujui',
           sisaCuti: sisaBaru,
+          sisaCutiN: sisaNBaru,
+          sisaCutiN1: sisaN1Baru,
           cutiTerpakai: terpakaiBaru,
-          verifikasi1: item.verifikasi1 || {
+          verifikasi1: {
             approved: true,
-            verifikatorNama: 'Administrator (Verifikasi Tahap 1)',
+            verifikatorNama: 'Petugas Kepegawaian',
             tanggal: nowStr,
-            catatan: 'Diverifikasi langsung oleh Administrator'
+            catatan: verifyCatatan || 'Disetujui dan disahkan langsung'
           },
           verifikasi2: {
             approved: true,
-            verifikatorNama: 'Administrator (a.n. Kepala Bagian TU)',
+            verifikatorNama: 'Petugas Kepegawaian',
             tanggal: nowStr,
-            catatan: verifyCatatan
+            catatan: verifyCatatan || 'Disetujui dan disahkan langsung'
           }
         };
       });
@@ -777,15 +782,11 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
 
     let matchStatus = true;
     if (cutiStatusFilter === 'pending') {
-      matchStatus = item.status === 'menunggu_verif_1' || item.status === 'menunggu_verif_2';
-    } else if (cutiStatusFilter === 'tahap1') {
-      matchStatus = item.status === 'menunggu_verif_1';
-    } else if (cutiStatusFilter === 'tahap2') {
-      matchStatus = item.status === 'menunggu_verif_2';
+      matchStatus = item.status !== 'disetujui' && !item.status.startsWith('ditolak');
     } else if (cutiStatusFilter === 'disetujui') {
       matchStatus = item.status === 'disetujui';
     } else if (cutiStatusFilter === 'ditolak') {
-      matchStatus = item.status === 'ditolak';
+      matchStatus = item.status === 'ditolak' || item.status.startsWith('ditolak');
     }
 
     let matchJenis = true;
@@ -797,9 +798,9 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
   });
 
   const totalCutiCount = cutiList.length;
-  const pendingCutiCount = cutiList.filter(c => c.status === 'menunggu_verif_1' || c.status === 'menunggu_verif_2').length;
+  const pendingCutiCount = cutiList.filter(c => c.status !== 'disetujui' && !c.status.startsWith('ditolak')).length;
   const approvedCutiCount = cutiList.filter(c => c.status === 'disetujui').length;
-  const rejectedCutiCount = cutiList.filter(c => c.status === 'ditolak').length;
+  const rejectedCutiCount = cutiList.filter(c => c.status === 'ditolak' || c.status.startsWith('ditolak')).length;
 
   // Filtered employees
   const filteredUsers = usersList.filter(u => {
@@ -1428,7 +1429,7 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
                 <span className="admin-card-title">Pusat Audit & Verifikasi Permohonan Cuti Pegawai</span>
               </div>
               <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
-                Pengawasan jatah cuti resmi, verifikasi berjenjang (Ketimker & Kobag TU), dan pemotongan kuota ASN
+                Pengawasan jatah cuti resmi, persetujuan Petugas Kepegawaian (1 Kali ACC), dan pemotongan kuota ASN
               </div>
             </div>
           </div>
@@ -1673,9 +1674,7 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
                 </span>
                 {[
                   { key: 'all', label: 'Semua', count: totalCutiCount },
-                  { key: 'pending', label: 'Menunggu Verifikasi', count: pendingCutiCount },
-                  { key: 'tahap1', label: 'Tahap 1 (Ketimker)', count: cutiList.filter(c => c.status === 'menunggu_verif_1').length },
-                  { key: 'tahap2', label: 'Tahap 2 (Kobag TU)', count: cutiList.filter(c => c.status === 'menunggu_verif_2').length },
+                  { key: 'pending', label: 'Menunggu ACC Kepegawaian', count: pendingCutiCount },
                   { key: 'disetujui', label: 'Disetujui', count: approvedCutiCount },
                   { key: 'ditolak', label: 'Ditolak', count: rejectedCutiCount }
                 ].map(tab => (
@@ -1838,49 +1837,30 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
                             </div>
                           </td>
 
-                          {/* 6. Alur Verifikasi 2-Stage */}
+                          {/* 6. Persetujuan Kepegawaian (1 Kali ACC) */}
                           <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '150px' }}>
-                              {/* Step 1: Ketimker */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem' }}>
-                                <span style={{
-                                  width: '16px',
-                                  height: '16px',
-                                  borderRadius: '50%',
-                                  background: (item.verifikasi1?.approved || item.status === 'menunggu_verif_2' || item.status === 'disetujui') ? '#10b981' : item.status === 'ditolak' && !item.verifikasi1?.approved ? '#ef4444' : '#f59e0b',
-                                  color: '#ffffff',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '10px',
-                                  fontWeight: 800
-                                }}>
-                                  {(item.verifikasi1?.approved || item.status === 'menunggu_verif_2' || item.status === 'disetujui') ? '✓' : item.status === 'ditolak' && !item.verifikasi1?.approved ? '✕' : '1'}
-                                </span>
-                                <span style={{ fontWeight: 600, color: (item.verifikasi1?.approved || item.status === 'menunggu_verif_2' || item.status === 'disetujui') ? '#166534' : '#64748b' }}>
-                                  {(item.verifikasi1?.approved || item.status === 'menunggu_verif_2' || item.status === 'disetujui') ? 'ACC Ketimker' : item.status === 'ditolak' && !item.verifikasi1?.approved ? 'Ditolak Tahap 1' : 'Verif 1 (Ketimker)'}
-                                </span>
-                              </div>
-
-                              {/* Step 2: Kobag TU */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem' }}>
-                                <span style={{
-                                  width: '16px',
-                                  height: '16px',
-                                  borderRadius: '50%',
-                                  background: item.status === 'disetujui' ? '#10b981' : item.status === 'ditolak' && item.verifikasi1?.approved ? '#ef4444' : item.status === 'menunggu_verif_2' ? '#f59e0b' : '#cbd5e1',
-                                  color: '#ffffff',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '10px',
-                                  fontWeight: 800
-                                }}>
-                                  {item.status === 'disetujui' ? '✓' : item.status === 'ditolak' && item.verifikasi1?.approved ? '✕' : '2'}
-                                </span>
-                                <span style={{ fontWeight: 600, color: item.status === 'disetujui' ? '#166534' : item.status === 'menunggu_verif_2' ? '#b45309' : '#64748b' }}>
-                                  {item.status === 'disetujui' ? 'ACC Kobag TU (Final)' : item.status === 'menunggu_verif_2' ? 'Menunggu Kobag' : item.status === 'ditolak' && item.verifikasi1?.approved ? 'Ditolak Tahap 2' : 'Verif 2 (Kobag TU)'}
-                                </span>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '50%',
+                                background: item.status === 'disetujui' ? '#10b981' : item.status === 'ditolak' ? '#ef4444' : '#f59e0b',
+                                color: '#ffffff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '11px',
+                                fontWeight: 800
+                              }}>
+                                {item.status === 'disetujui' ? '✓' : item.status === 'ditolak' ? '✕' : '⏳'}
+                              </span>
+                              <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: item.status === 'disetujui' ? '#166534' : item.status === 'ditolak' ? '#b91c1c' : '#b45309' }}>
+                                  {item.status === 'disetujui' ? 'ACC Kepegawaian (Selesai)' : item.status === 'ditolak' ? 'Ditolak Kepegawaian' : 'Menunggu ACC Kepegawaian'}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                                  {item.status === 'disetujui' ? 'Jatah kuota terpotong' : item.status === 'ditolak' ? 'Permohonan ditolak' : '1 Kali ACC langsung disetujui'}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -1937,6 +1917,28 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
                                   </button>
                                 </>
                               ) : null}
+
+                              <button
+                                onClick={() => setSelectedPrintCutiAdmin(item)}
+                                title="Cetak Formulir Resmi Cuti BKN (A4)"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  border: '1px solid #bfdbfe',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <FileText size={13} />
+                                <span>Formulir BKN</span>
+                              </button>
 
                               <button
                                 onClick={() => handleOpenDetailModal(item)}
@@ -3482,69 +3484,37 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
               {verifyModalType === 'approve' ? (
                 <div>
                   <div className="admin-form-group">
-                    <label style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b', marginBottom: '6px', display: 'block' }}>
-                      Tingkat Otorisasi Persetujuan
-                    </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {selectedCutiAction.status === 'menunggu_verif_1' && (
-                        <label style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: verifyTargetStage === '1' ? '2px solid #059669' : '1px solid #cbd5e1',
-                          background: verifyTargetStage === '1' ? '#ecfdf5' : '#ffffff',
-                          cursor: 'pointer'
-                        }}>
-                          <input 
-                            type="radio" 
-                            name="verifyStage" 
-                            checked={verifyTargetStage === '1'} 
-                            onChange={() => {
-                              setVerifyTargetStage('1');
-                              setVerifyCatatan('Disetujui Tahap 1 (a.n. Ketua Tim Kerja). Beban kerja dinas telah dikoordinasikan.');
-                            }}
-                          />
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#065f46' }}>
-                              Setujui Tahap 1 (Ketimker / Atasan Langsung)
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              Berkas lolos telaah substantif dan berlanjut ke persetujuan definitif Kobag TU.
-                            </div>
-                          </div>
-                        </label>
-                      )}
-
-                      <label style={{
+                    <div style={{
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '2px solid #059669',
+                      background: '#ecfdf5',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: '#059669',
+                        color: '#fff',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        border: verifyTargetStage === '2' ? '2px solid #059669' : '1px solid #cbd5e1',
-                        background: verifyTargetStage === '2' ? '#ecfdf5' : '#ffffff',
-                        cursor: 'pointer'
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        flexShrink: 0
                       }}>
-                        <input 
-                          type="radio" 
-                          name="verifyStage" 
-                          checked={verifyTargetStage === '2'} 
-                          onChange={() => {
-                            setVerifyTargetStage('2');
-                            setVerifyCatatan('Disetujui Definitif (a.n. Kepala Bagian Tata Usaha). Pengesahan cuti resmi disetujui.');
-                          }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#065f46' }}>
-                            {selectedCutiAction.status === 'menunggu_verif_1' ? 'Persetujuan Penuh Langsung (Hak Istimewa Admin / Kobag TU)' : 'Setujui Definitif Tahap 2 (Kobag TU - Final)'}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            Berkas langsung disahkan penuh resmi balai dan kuota cuti tahunan pegawai otomatis dipotong.
-                          </div>
+                        ✓
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#065f46' }}>
+                          Persetujuan Cuti (Role Kepegawaian - 1 Kali ACC Langsung Selesai)
                         </div>
-                      </label>
+                        <div style={{ fontSize: '0.78rem', color: '#047857', marginTop: '2px' }}>
+                          Permohonan cuti langsung disahkan berstatus <strong>Disetujui</strong> dan kuota cuti pegawai otomatis dipotong sistem.
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -3832,11 +3802,20 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
               <button 
                 type="button" 
                 className="btn-admin-export"
+                style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => setSelectedPrintCutiAdmin(selectedCutiDetail)}
+              >
+                <FileText size={16} />
+                <span>Formulir BKN</span>
+              </button>
+              <button 
+                type="button" 
+                className="btn-admin-export"
                 onClick={() => setShowCutiDetailModal(false)}
               >
                 Tutup
               </button>
-              {(selectedCutiDetail.status === 'menunggu_verif_1' || selectedCutiDetail.status === 'menunggu_verif_2') && (
+              {(selectedCutiDetail.status === 'menunggu_verif_1' || selectedCutiDetail.status === 'menunggu_verif_2' || selectedCutiDetail.status === 'dalam_proses') && (
                 <button 
                   type="button" 
                   className="btn-admin-add"
@@ -3852,6 +3831,14 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL CETAK FORMULIR CUTI RESMI BKN */}
+      {selectedPrintCutiAdmin && (
+        <CutiFormulirBkn
+          cuti={selectedPrintCutiAdmin}
+          onClose={() => setSelectedPrintCutiAdmin(null)}
+        />
       )}
     </div>
   );

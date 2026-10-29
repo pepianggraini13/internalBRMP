@@ -1,7 +1,3 @@
-# Agent Scope Restriction: Strictly Admin Only
+# Agent Scope: Full Project Access
 
-The agent is STRICTLY restricted to editing and modifying files ONLY inside:
-- `client/src/admin/` (Frontend Administrator)
-- `server/src/admin/` (Backend Administrator)
-
-Under NO circumstances should any file outside these two directories be edited, modified, renamed, or deleted. All sibling folders (`client/src/components/`, `server/src/routes/`, `php_backend/`, `brmpSPT/`, etc.) must remain 100% untouched.
+Per user authorization on 2026-10-29, the agent has full edit access to all necessary files across the client and server to implement cuti features and related modules.

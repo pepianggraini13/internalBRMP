@@ -37,7 +37,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 
-export default function Sidebar({ currentView, setCurrentView, user, isOpen, onClose, onLogout }) {
+export default function Sidebar({ currentView, setCurrentView, user, isUserAdmin, isOpen, onClose, onLogout }) {
   // Dynamic live Indonesian formatted date that updates automatically with day changes
   const [currentDateString, setCurrentDateString] = useState(() => {
     const today = new Date();
@@ -91,7 +91,14 @@ export default function Sidebar({ currentView, setCurrentView, user, isOpen, onC
     }
   };
 
-  const isAdmin = true; // Admin Web Portal selalu menggunakan Sidebar Administrator
+  const isAdmin = Boolean(
+    isUserAdmin || 
+    user?.systemRole === 'admin' || 
+    user?.role === 'admin' || 
+    user?.approvalRole === 'admin' || 
+    user?.nip === '198001012005011001' || 
+    user?.id === 'PEG-ADM'
+  );
 
   // If Admin mode, delegate to modular AdminSidebar
   if (isAdmin) {
@@ -245,7 +252,7 @@ export default function Sidebar({ currentView, setCurrentView, user, isOpen, onC
                 className={`submenu-btn ${currentView === 'pengajuan-cuti' ? 'active' : ''}`}
                 onClick={() => navigateTo('pengajuan-cuti')}
               >
-                <span>• Pengajuan & Verifikasi (2 Tahap)</span>
+                <span>• Pengajuan & Persetujuan Cuti</span>
               </button>
             </div>
           )}
@@ -421,6 +428,45 @@ export default function Sidebar({ currentView, setCurrentView, user, isOpen, onC
               <Settings size={18} />
               <span>Pengaturan Akun</span>
             </div>
+          </button>
+
+          {/* Tombol Logout Sidebar */}
+          <button 
+            className="nav-item-btn"
+            onClick={onLogout}
+            title="Keluar dari Sistem"
+            style={{
+              marginTop: '8px',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '1px solid #fecaca',
+              background: '#fef2f2',
+              color: '#dc2626',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              gap: '10px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#dc2626';
+              e.currentTarget.style.color = '#ffffff';
+              const icon = e.currentTarget.querySelector('svg');
+              if (icon) icon.style.stroke = '#ffffff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#fef2f2';
+              e.currentTarget.style.color = '#dc2626';
+              const icon = e.currentTarget.querySelector('svg');
+              if (icon) icon.style.stroke = '#dc2626';
+            }}
+          >
+            <LogOut size={18} color="#dc2626" />
+            <span>Keluar Sistem</span>
           </button>
         </div>
 

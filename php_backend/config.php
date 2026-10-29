@@ -8,42 +8,85 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-// Database Credentials (from cPanel konek.php)
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'brmy4429_absensi');
-define('DB_USER', 'brmy4429_userabsen');
-define('DB_PASS', 'XGs!VX=I1Bmv');
-define('DB_PORT', '3306');
+// Database Configuration: Support SQLite (Synology Web Station) in dedicated folder 'database/'
+$possibleSqlitePaths = [
+    __DIR__ . '/database/absensi.sqlite',
+    dirname(__DIR__) . '/database/absensi.sqlite',
+    __DIR__ . '/absensi.sqlite'
+];
+
+$sqliteFile = null;
+foreach ($possibleSqlitePaths as $p) {
+    if (file_exists($p)) {
+        $sqliteFile = $p;
+        break;
+    }
+}
+
+if (!$sqliteFile) {
+    $sqliteFile = __DIR__ . '/database/absensi.sqlite';
+    $dbDir = dirname($sqliteFile);
+    if (!is_dir($dbDir)) {
+        @mkdir($dbDir, 0755, true);
+    }
+}
 
 $pdo = null;
 $useMysql = false;
+$isSqlite = false;
 
-try {
-    $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
-    $options = [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false
-    ];
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
-    
-    // Quick check if table exists (t_ptk or tb_pegawai)
-    $check = $pdo->query("SHOW TABLES LIKE 't_ptk'");
-    if ($check && $check->rowCount() > 0) {
-        $useMysql = true;
-    } else {
-        $check2 = $pdo->query("SHOW TABLES LIKE 'tb_pegawai'");
-        if ($check2 && $check2->rowCount() > 0) {
-            $useMysql = true;
-        }
+// 1. Try SQLite first (Optimal for Synology Web Station zero-configuration)
+if (file_exists($sqliteFile) || extension_loaded('pdo_sqlite')) {
+    try {
+        $pdo = new PDO("sqlite:" . $sqliteFile, null, null, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_TIMEOUT => 5
+        ]);
+        $pdo->exec('PRAGMA journal_mode = WAL;');
+        $pdo->exec('PRAGMA foreign_keys = ON;');
+        $useMysql = true; // Flag indicating PDO database is available
+        $isSqlite = true;
+    } catch (Exception $e) {
+        $pdo = null;
+        $isSqlite = false;
     }
-} catch (Exception $e) {
-    $useMysql = false;
+}
+
+// 2. Fallback to MySQL if SQLite not active or failed
+if (!$pdo) {
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'brmy4429_absensi');
+    define('DB_USER', 'brmy4429_userabsen');
+    define('DB_PASS', 'XGs!VX=I1Bmv');
+    define('DB_PORT', '3306');
+
+    try {
+        $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
+        ];
+        $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        
+        $check = $pdo->query("SHOW TABLES LIKE 't_ptk'");
+        if ($check && $check->rowCount() > 0) {
+            $useMysql = true;
+        } else {
+            $check2 = $pdo->query("SHOW TABLES LIKE 'tb_pegawai'");
+            if ($check2 && $check2->rowCount() > 0) {
+                $useMysql = true;
+            }
+        }
+    } catch (Exception $e) {
+        $useMysql = false;
+    }
 }
 
 // Helper: send JSON response
@@ -57,7 +100,9 @@ function jsonResponse($data, $statusCode = 200) {
 // Helper: get JSON request body
 function getJsonBody() {
     $raw = file_get_contents('php://input');
-    if (empty($raw)) return [];
+    if (empty($raw)) {
+        return (isset($GLOBALS['mock_json_body']) && is_array($GLOBALS['mock_json_body'])) ? $GLOBALS['mock_json_body'] : [];
+    }
     $data = json_decode($raw, true);
     return is_array($data) ? $data : [];
 }
