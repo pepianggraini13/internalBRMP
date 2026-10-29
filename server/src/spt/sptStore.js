@@ -26,6 +26,99 @@ export let DEFAULT_DASAR = [
   "Daftar Isian Pelaksanaan Anggaran (DIPA) Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta Tahun Anggaran Berjalan."
 ];
 
+/**
+ * Daftar Pegawai dengan Role Panitera SPT
+ * Peran fleksibel: dapat ditambah/dikurangi kapan saja oleh Administrator
+ */
+export let paniteraList = [
+  {
+    id: "PAN-001",
+    pegawaiId: "PEG-004",
+    nama: "Devi Eka Nuvitasari, S.H.",
+    nip: "198906012015032004",
+    jabatan: "Penelaah Teknis Kebijakan",
+    golongan: "III/b",
+    unitKerja: "Tim Kerja Pengelolaan Sumber Daya Manusia",
+    tglDitugaskan: "2026-10-01",
+    ditugaskanOleh: "Administrator Sistem",
+    status: "aktif"
+  },
+  {
+    id: "PAN-002",
+    pegawaiId: "PEG-017",
+    nama: "Novita Widiyanti, A.Md",
+    nip: "199111042023212041",
+    jabatan: "Pengadministrasi Perkantoran",
+    golongan: "VII",
+    unitKerja: "Tim Kerja Tata Usaha dan Rumah Tangga",
+    tglDitugaskan: "2026-10-05",
+    ditugaskanOleh: "Administrator Sistem",
+    status: "aktif"
+  }
+];
+
+export const getPaniteraList = () => {
+  return paniteraList;
+};
+
+export const isUserPanitera = (user) => {
+  if (!user) return false;
+  const userNip = String(user.nip || '').trim();
+  const userId = String(user.id || user.pegawaiId || '').toUpperCase();
+  const userRole = String(user.role || user.sptRole || '').toLowerCase();
+
+  if (userRole === 'admin' || userRole === 'panitera' || userId === 'PEG-ADM' || user.username === 'admin') {
+    return true;
+  }
+
+  return paniteraList.some(p => 
+    (p.nip && p.nip === userNip) || 
+    (p.pegawaiId && String(p.pegawaiId).toUpperCase() === userId) ||
+    (p.id && String(p.id).toUpperCase() === userId)
+  );
+};
+
+export const addPanitera = (pegawaiData, adminName = "Administrator") => {
+  if (!pegawaiData || (!pegawaiData.nip && !pegawaiData.id)) {
+    throw new Error("Data pegawai tidak valid untuk ditambahkan sebagai Panitera.");
+  }
+
+  const existing = paniteraList.find(p => 
+    (p.nip && p.nip === pegawaiData.nip) || 
+    (p.pegawaiId && p.pegawaiId === (pegawaiData.id || pegawaiData.pegawaiId))
+  );
+
+  if (existing) {
+    return existing;
+  }
+
+  const newPanitera = {
+    id: `PAN-${String(paniteraList.length + 1).padStart(3, '0')}`,
+    pegawaiId: pegawaiData.id || pegawaiData.pegawaiId || `PEG-${Date.now()}`,
+    nama: pegawaiData.nama,
+    nip: pegawaiData.nip || "-",
+    jabatan: pegawaiData.jabatan || "Pegawai BRMP DIY",
+    golongan: pegawaiData.golongan || "-",
+    unitKerja: pegawaiData.unitKerja || pegawaiData.divisi || "Balai Penerapan Standar Instrumen Pertanian DIY",
+    tglDitugaskan: new Date().toISOString().split('T')[0],
+    ditugaskanOleh: adminName,
+    status: "aktif"
+  };
+
+  paniteraList.push(newPanitera);
+  return newPanitera;
+};
+
+export const removePanitera = (identifier) => {
+  const initialLen = paniteraList.length;
+  paniteraList = paniteraList.filter(p => 
+    p.id !== identifier && 
+    p.nip !== identifier && 
+    p.pegawaiId !== identifier
+  );
+  return paniteraList.length < initialLen;
+};
+
 export let sptList = [
   {
     id: "SPT-2026-001",
@@ -45,6 +138,12 @@ export let sptList = [
     tempatTujuan: "Balai Penyuluhan Pertanian (BPP) Sentolo, Gapoktan Mandiri",
     untukMelaksanakan: "Melaksanakan bimbingan teknis penerapan standar budidaya padi organik dan modernisasi alsintan pompa air irigasi perpompaan.",
     uraian: "Melaksanakan bimbingan teknis penerapan standar budidaya padi organik dan modernisasi alsintan pompa air irigasi perpompaan.",
+    paniteraPengaju: {
+      id: "PAN-002",
+      nama: "Novita Widiyanti, A.Md",
+      nip: "199111042023212041",
+      unitKerja: "Tim Kerja Tata Usaha dan Rumah Tangga"
+    },
     pemohon: {
       id: "usr-peg-004",
       nama: "Devi Eka Nuvitasari, S.H.",
@@ -92,14 +191,21 @@ export let sptList = [
     isApproved: true,
     fileSptTtdName: "SPT_Resmi_B-142_Kementan_BRMP_DIY_ttd.pdf",
     fileSptTtdUrl: null,
+    tglPengesahan: "2026-09-21",
+    keaslian: {
+      kodeKeaslian: "BSRE-BRMP-2026-001",
+      tglPengesahan: "2026-09-21",
+      tglVerifikasi: "21 September 2026, 08:45 WIB",
+      pejabatPengesah: "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU) & Dr. Soeharsono, S.Pt, M.Si (Kepala Balai)",
+      statusVerifikasi: "TERDAFTAR RESMI & TERVERIFIKASI ASLI BSRE BSSN",
+      qrPayload: "https://brmp-diy.pertanian.go.id/spt/verify?id=SPT-2026-001&nomor=B-142%2FKP.320%2FH.14.7%2F10%2F2026&tgl=2026-09-21"
+    },
     timeline: [
-      { waktu: "2026-09-20 09:15", aktor: "Devi Eka Nuvitasari, S.H.", aksi: "Pengajuan usulan SPT dibuat", status: "diajukan" },
-      { waktu: "2026-09-20 11:30", aktor: "Dwi Dinia Rahayu, S.Kom, M.T.I", aksi: "Disetujui Ketua Tim Kerja (Approval Unit)", status: "approved_ketimker" },
-      { waktu: "2026-09-21 08:45", aktor: "Agung Ariyanto, SEI., M.Ec., Dev.", aksi: "Disetujui Kobag TU (Approval Utama)", status: "approved_kobag_tu" },
-      { waktu: "2026-09-21 10:00", aktor: "Novita Widiyanti, A.Md (Sekretariat)", aksi: "Nomor SPT resmi B-142 diterbitkan & siap cetak naskah dinas resmi", status: "terbit" }
+      { waktu: "2026-09-20 09:15", aktor: "Devi Eka Nuvitasari, S.H. (Panitera)", aksi: "Pengajuan usulan SPT dibuat oleh Panitera", status: "diajukan" },
+      { waktu: "2026-09-21 08:45", aktor: "Agung Ariyanto, SEI., M.Ec., Dev.", aksi: "Disetujui Kobag TU (Approval Tunggal)", status: "approved_kobag_tu" },
+      { waktu: "2026-09-21 10:00", aktor: "Novita Widiyanti, A.Md (Sekretariat)", aksi: "Nomor SPT resmi B-142 diterbitkan & naskah dinas siap cetak dengan QR Keaslian", status: "terbit" }
     ],
-    catatanKetimker: "Disetujui untuk pendampingan alsintan di Kulon Progo. Mohon koordinasi dengan BPP setempat.",
-    catatanKobagTu: "Sesuai dengan target kinerja triwulan IV BRMP DIY. Lanjutkan.",
+    catatanKobagTu: "Sesuai dengan target kinerja triwulan IV BRMP DIY. Lanjutkan penugasan dinas.",
     tandaTanganPejabat: {
       nama: "Dr. Soeharsono, S.Pt, M.Si",
       nip: "197109271998031002",
@@ -134,6 +240,12 @@ export let sptList = [
     tempatTujuan: "Lahan Demplot Uji Tanah & Pupuk Organik Kelompok Tani Subur Makmur",
     untukMelaksanakan: "Pengambilan sampel tanah dan pupuk organik terfermentasi untuk uji mutu laboratorium kimia tanah dan evaluasi standar baku mutu.",
     uraian: "Pengambilan sampel tanah dan pupuk organik terfermentasi untuk uji mutu laboratorium kimia tanah dan evaluasi standar baku mutu.",
+    paniteraPengaju: {
+      id: "PAN-001",
+      nama: "Devi Eka Nuvitasari, S.H.",
+      nip: "198906012015032004",
+      unitKerja: "Tim Kerja Pengelolaan Sumber Daya Manusia"
+    },
     pemohon: {
       id: "usr-admin",
       nama: "Widada, A.Md",
@@ -177,16 +289,23 @@ export let sptList = [
       }
     ],
     status: "approved_kobag_tu",
-    statusLabel: "Menunggu Penomoran & Cetak Sekretariat",
-    isApproved: false,
+    statusLabel: "Disetujui Kobag TU (Menunggu Penomoran)",
+    isApproved: true,
     fileSptTtdName: null,
     fileSptTtdUrl: null,
+    tglPengesahan: "2026-09-23",
+    keaslian: {
+      kodeKeaslian: "BSRE-BRMP-2026-002",
+      tglPengesahan: "2026-09-23",
+      tglVerifikasi: "23 September 2026, 09:10 WIB",
+      pejabatPengesah: "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)",
+      statusVerifikasi: "TERDAFTAR RESMI & TERVERIFIKASI ASLI BSRE BSSN",
+      qrPayload: "https://brmp-diy.pertanian.go.id/spt/verify?id=SPT-2026-002&nomor=B-148%2FKP.320%2FH.14.7%2F10%2F2026&tgl=2026-09-23"
+    },
     timeline: [
-      { waktu: "2026-09-22 10:00", aktor: "Widada, A.Md", aksi: "Pengajuan usulan SPT dibuat", status: "diajukan" },
-      { waktu: "2026-09-22 14:20", aktor: "Widada, A.Md (Ketimker Lab)", aksi: "Disetujui Ketua Tim Kerja", status: "approved_ketimker" },
-      { waktu: "2026-09-23 09:10", aktor: "Agung Ariyanto, SEI., M.Ec., Dev.", aksi: "Disetujui Kobag TU (Approval Utama)", status: "approved_kobag_tu" }
+      { waktu: "2026-09-22 10:00", aktor: "Devi Eka Nuvitasari, S.H. (Panitera)", aksi: "Pengajuan usulan SPT dibuat oleh Panitera", status: "diajukan" },
+      { waktu: "2026-09-23 09:10", aktor: "Agung Ariyanto, SEI., M.Ec., Dev.", aksi: "Disetujui Kobag TU (Approval Tunggal)", status: "approved_kobag_tu" }
     ],
-    catatanKetimker: "Sampel sangat dibutuhkan untuk validasi data pengujian instrumen laboratorium.",
     catatanKobagTu: "Disetujui. Pastikan kelengkapan alat uji pengambilan sampel steril.",
     tandaTanganPejabat: {
       nama: "Dr. Soeharsono, S.Pt, M.Si",
@@ -213,6 +332,12 @@ export let sptList = [
     tempatTujuan: "Aula BPP Imogiri & Kelompok Tani Hutan Rakyat",
     untukMelaksanakan: "Sosialisasi dan diseminasi standar instrumen pupuk hayati dan pestisida nabati ramah lingkungan bagi penyuluh dan kelompok tani binaan.",
     uraian: "Sosialisasi dan diseminasi standar instrumen pupuk hayati dan pestisida nabati ramah lingkungan bagi penyuluh dan kelompok tani binaan.",
+    paniteraPengaju: {
+      id: "PAN-002",
+      nama: "Novita Widiyanti, A.Md",
+      nip: "199111042023212041",
+      unitKerja: "Tim Kerja Tata Usaha dan Rumah Tangga"
+    },
     pemohon: {
       id: "usr-peg-065",
       nama: "Diah Sulistyorini, SP, MP",
@@ -256,12 +381,19 @@ export let sptList = [
       }
     ],
     status: "diajukan",
-    statusLabel: "Menunggu Approval Ketimker",
+    statusLabel: "Menunggu Persetujuan Kobag TU",
     isApproved: false,
+    keaslian: {
+      kodeKeaslian: "BSRE-BRMP-2026-003",
+      tglPengesahan: "2026-09-25",
+      tglVerifikasi: "25 September 2026, 08:30 WIB",
+      pejabatPengesah: "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)",
+      statusVerifikasi: "MENUNGGU PENGESAHAN KOBAG TU",
+      qrPayload: "https://brmp-diy.pertanian.go.id/spt/verify?id=SPT-2026-003&tgl=2026-09-25"
+    },
     timeline: [
-      { waktu: "2026-09-25 08:30", aktor: "Diah Sulistyorini, SP, MP", aksi: "Pengajuan usulan SPT dibuat", status: "diajukan" }
+      { waktu: "2026-09-25 08:30", aktor: "Novita Widiyanti, A.Md (Panitera)", aksi: "Pengajuan usulan SPT dibuat oleh Panitera", status: "diajukan" }
     ],
-    catatanKetimker: null,
     catatanKobagTu: null,
     tandaTanganPejabat: {
       nama: "Dr. Soeharsono, S.Pt, M.Si",
@@ -288,6 +420,12 @@ export let sptList = [
     tempatTujuan: "Dinas Pertanian dan Ketahanan Pangan DIY & Arsip Daerah",
     untukMelaksanakan: "Koordinasi pengelolaan arsip dinas, tertib tata persuratan kedinasan, dan pengelolaan rumah tangga kantor BRMP DIY.",
     uraian: "Koordinasi pengelolaan arsip dinas, tertib tata persuratan kedinasan, dan pengelolaan rumah tangga kantor BRMP DIY.",
+    paniteraPengaju: {
+      id: "PAN-001",
+      nama: "Devi Eka Nuvitasari, S.H.",
+      nip: "198906012015032004",
+      unitKerja: "Tim Kerja Pengelolaan Sumber Daya Manusia"
+    },
     pemohon: {
       id: "usr-peg-016",
       nama: "Sinung Rustijarno, S.PI, M.SI",
@@ -331,12 +469,19 @@ export let sptList = [
       }
     ],
     status: "diajukan",
-    statusLabel: "Menunggu Approval Ketimker",
+    statusLabel: "Menunggu Persetujuan Kobag TU",
     isApproved: false,
+    keaslian: {
+      kodeKeaslian: "BSRE-BRMP-2026-004",
+      tglPengesahan: "2026-09-26",
+      tglVerifikasi: "26 September 2026, 10:00 WIB",
+      pejabatPengesah: "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)",
+      statusVerifikasi: "MENUNGGU PENGESAHAN KOBAG TU",
+      qrPayload: "https://brmp-diy.pertanian.go.id/spt/verify?id=SPT-2026-004&tgl=2026-09-26"
+    },
     timeline: [
-      { waktu: "2026-09-26 10:00", aktor: "Sinung Rustijarno, S.PI, M.SI", aksi: "Pengajuan usulan SPT dibuat (Menunggu persetujuan Ketimker TU)", status: "diajukan" }
+      { waktu: "2026-09-26 10:00", aktor: "Devi Eka Nuvitasari, S.H. (Panitera)", aksi: "Pengajuan usulan SPT dibuat oleh Panitera (Menunggu persetujuan Kobag TU)", status: "diajukan" }
     ],
-    catatanKetimker: null,
     catatanKobagTu: null,
     tandaTanganPejabat: {
       nama: "Dr. Soeharsono, S.Pt, M.Si",
@@ -347,7 +492,65 @@ export let sptList = [
   }
 ];
 
-export const addSpt = (sptData) => {
+/**
+ * Filter daftar SPT untuk seorang pengguna:
+ * - Admin, Kobag TU, dan Panitera: dapat melihat semua SPT
+ * - Pegawai biasa: HANYA melihat SPT miliknya sendiri (sebagai pemohon atau anggota yang bertugas)
+ */
+export const getSptListForUser = (user) => {
+  if (!user) return sptList;
+
+  const role = String(user.role || user.sptRole || '').toLowerCase();
+  const nip = String(user.nip || '').trim();
+  const id = String(user.id || user.pegawaiId || '').toUpperCase();
+  const nama = String(user.nama || '').trim().toLowerCase();
+
+  // Admin, Kobag TU, atau Panitera memiliki visibilitas penuh
+  if (
+    role === 'admin' || 
+    role === 'kobag_tu' || 
+    role === 'panitera' || 
+    role === 'admin_sekretariat' ||
+    nip === '198101312009121004' || 
+    id === 'PEG-002' ||
+    id === 'PEG-ADM' ||
+    isUserPanitera(user)
+  ) {
+    return sptList;
+  }
+
+  // Pegawai Biasa: HANYA SPT miliknya sendiri
+  return sptList.filter(spt => {
+    // 1. Cek pemohon
+    if (spt.pemohon?.nip && spt.pemohon.nip === nip) return true;
+    if (spt.pemohon?.id && String(spt.pemohon.id).toUpperCase() === id) return true;
+    if (spt.pemohon?.nama && spt.pemohon.nama.trim().toLowerCase() === nama) return true;
+
+    // 2. Cek personil anggota pelaksana
+    const inAnggota = (spt.anggota || []).some(a => 
+      (a.nip && a.nip === nip) || 
+      (a.id && String(a.id).toUpperCase() === id) ||
+      (a.nama && a.nama.trim().toLowerCase() === nama)
+    );
+    if (inAnggota) return true;
+
+    // 3. Cek pegawaiBertugas
+    const inBertugas = (spt.pegawaiBertugas || []).some(b => 
+      (b.nip && b.nip === nip) || 
+      (b.nama && b.nama.trim().toLowerCase() === nama)
+    );
+    if (inBertugas) return true;
+
+    return false;
+  });
+};
+
+export const addSpt = (sptData, submitterUser = null) => {
+  // Validasi: Hanya Panitera atau Admin yang boleh mengajukan SPT
+  if (submitterUser && !isUserPanitera(submitterUser)) {
+    throw new Error("Akses Ditolak: Hanya pegawai dengan peran Panitera yang berhak mengajukan usulan SPT.");
+  }
+
   const newId = `SPT-${new Date().getFullYear()}-${String(sptList.length + 1).padStart(3, '0')}`;
   
   const start = new Date(sptData.dariTanggal || sptData.tglMulai);
@@ -376,12 +579,28 @@ export const addSpt = (sptData) => {
     peranDalamTugas: ang.peranDalamTugas || (i === 0 ? "Penanggung Jawab (PJ)" : "Anggota Pelaksana")
   }));
 
+  const tglHariIni = new Date().toISOString().split('T')[0];
+  const tglFormatted = formatDateIndo(tglHariIni);
+  const waktuNowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
+
+  const paniteraInfo = submitterUser ? {
+    id: submitterUser.id || "PAN-AKTIF",
+    nama: submitterUser.nama || "Panitera BRMP DIY",
+    nip: submitterUser.nip || "-",
+    unitKerja: submitterUser.unitKerja || submitterUser.divisi || "Kepaniteraan SPT BRMP DIY"
+  } : (sptData.paniteraPengaju || {
+    id: "PAN-001",
+    nama: "Devi Eka Nuvitasari, S.H.",
+    nip: "198906012015032004",
+    unitKerja: "Tim Kerja Pengelolaan Sumber Daya Manusia"
+  });
+
   const newItem = {
     id: newId,
     nomorSpt: null,
     klasifikasiId: sptData.klasifikasiId || "KLAS-01",
     klasifikasiNama: sptData.klasifikasiNama || "Perjalanan Dinas Dalam Daerah DIY",
-    tglPengajuan: new Date().toISOString().split('T')[0],
+    tglPengajuan: tglHariIni,
     tglMulai,
     tglSelesai,
     dariTanggal: tglMulai,
@@ -394,26 +613,37 @@ export const addSpt = (sptData) => {
     tempatTujuan: sptData.tempatTujuan || sptData.kotaTujuan,
     untukMelaksanakan: sptData.untukMelaksanakan || sptData.uraian,
     uraian: sptData.uraian || sptData.untukMelaksanakan,
-    pemohon: sptData.pemohon || {
-      nama: anggotaNormalized[0]?.nama || "Pegawai BRMP DIY",
-      nip: anggotaNormalized[0]?.nip || "-"
+    paniteraPengaju: paniteraInfo,
+    pemohon: (sptData.pemohon && sptData.pemohon.nama !== paniteraInfo.nama) ? sptData.pemohon : {
+      id: anggotaNormalized[0]?.id || "PEG-001",
+      nama: anggotaNormalized[0]?.nama || "Pegawai Bertugas",
+      nip: anggotaNormalized[0]?.nip || "-",
+      unitKerja: anggotaNormalized[0]?.unitKerja || "Balai Penerapan Standar Instrumen Pertanian DIY"
     },
     anggota: anggotaNormalized,
     pegawaiBertugas: anggotaNormalized,
     status: "diajukan",
-    statusLabel: "Menunggu Approval Ketimker",
+    statusLabel: "Menunggu Persetujuan Kobag TU",
     isApproved: false,
     fileSptTtdName: null,
     fileSptTtdUrl: null,
+    tglPengesahan: tglHariIni,
+    keaslian: {
+      kodeKeaslian: `BSRE-BRMP-${new Date().getFullYear()}-${String(sptList.length + 1).padStart(3, '0')}`,
+      tglPengesahan: tglHariIni,
+      tglVerifikasi: `${tglFormatted}, ${waktuNowStr.split(' ')[1]} WIB`,
+      pejabatPengesah: "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)",
+      statusVerifikasi: "MENUNGGU PENGESAHAN KOBAG TU",
+      qrPayload: `https://brmp-diy.pertanian.go.id/spt/verify?id=${newId}&tgl=${tglHariIni}`
+    },
     timeline: [
       {
-        waktu: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        aktor: sptData.pemohon?.nama || anggotaNormalized[0]?.nama || "Pemohon",
-        aksi: "Pengajuan usulan SPT dibuat melalui sistem",
+        waktu: waktuNowStr,
+        aktor: `${paniteraInfo.nama} (Panitera)`,
+        aksi: "Pengajuan usulan penugasan SPT diajukan oleh Panitera ke Kepala Bagian Tata Usaha (Kobag TU)",
         status: "diajukan"
       }
     ],
-    catatanKetimker: null,
     catatanKobagTu: null,
     tandaTanganPejabat: {
       nama: "Dr. Soeharsono, S.Pt, M.Si",
@@ -427,77 +657,60 @@ export const addSpt = (sptData) => {
   return newItem;
 };
 
-export const approveSpt = (sptId, role = 'all', note = '') => {
+/**
+ * Persetujuan SPT (Approval tunggal hanya perlu dari Kobag TU)
+ */
+export const approveSpt = (sptId, role = 'kobag_tu', note = '', userApprover = null) => {
   const spt = sptList.find(s => String(s.id) === String(sptId));
   if (!spt) return null;
 
-  const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
+  const now = new Date();
+  const nowStr = now.toISOString().replace('T', ' ').substring(0, 16);
+  const tglIndo = now.toISOString().split('T')[0];
 
-  if (role === 'ketimker' || role === 'kepalaDivisi') {
-    spt.status = "approved_ketimker";
-    spt.statusLabel = "Menunggu Persetujuan Kobag TU";
-    spt.catatanKetimker = note || "Usulan penugasan dinas disetujui tingkat unit kerja.";
-    spt.timeline.push({
-      waktu: nowStr,
-      aktor: "Ketua Tim Kerja (Ketimker)",
-      aksi: `Disetujui Unit Kerja: ${spt.catatanKetimker}`,
-      status: "approved_ketimker"
-    });
-  } else if (role === 'kobag_tu' || role === 'kepalaTU') {
-    spt.status = "approved_kobag_tu";
-    spt.statusLabel = "Menunggu Penomoran & Cetak Sekretariat";
-    spt.catatanKobagTu = note || "Disetujui Kepala Bagian Tata Usaha.";
-    spt.timeline.push({
-      waktu: nowStr,
-      aktor: "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)",
-      aksi: `Disetujui Kobag TU (Approval Utama): ${spt.catatanKobagTu}`,
-      status: "approved_kobag_tu"
-    });
-  } else if (role === 'terbitkan' || role === 'sekretariat') {
-    if (!spt.nomorSpt) {
-      spt.nomorSpt = `B-${Math.floor(100 + Math.random() * 900)}/KP.320/H.14.7/10/2026`;
-    }
-    spt.status = "terbit";
-    spt.statusLabel = "SPT Terbit / Siap Cetak";
-    spt.isApproved = true;
-    spt.timeline.push({
-      waktu: nowStr,
-      aktor: "Admin Sekretariat BRMP DIY",
-      aksi: `Nomor surat dinas resmi ${spt.nomorSpt} diterbitkan dan naskah dinas siap cetak`,
-      status: "terbit"
-    });
-  } else {
-    // Approve all
-    if (!spt.nomorSpt) {
-      spt.nomorSpt = `B-${Math.floor(100 + Math.random() * 900)}/KP.320/H.14.7/10/2026`;
-    }
-    spt.status = "terbit";
-    spt.statusLabel = "SPT Terbit / Siap Cetak";
-    spt.isApproved = true;
-    spt.timeline.push({
-      waktu: nowStr,
-      aktor: "Persetujuan Lengkap Sistem",
-      aksi: "Seluruh tahapan persetujuan (Ketimker, Kobag TU, Sekretariat) disahkan",
-      status: "terbit"
-    });
+  const approverName = userApprover?.nama || "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)";
+
+  spt.status = "approved_kobag_tu";
+  spt.statusLabel = "Disetujui Kobag TU / Siap Terbit";
+  spt.isApproved = true;
+  spt.catatanKobagTu = note || "Usulan penugasan dinas disetujui Kepala Bagian Tata Usaha.";
+  spt.tglPengesahan = tglIndo;
+
+  if (spt.keaslian) {
+    spt.keaslian.statusVerifikasi = "TERVERIFIKASI & DISETUJUI KOBAG TU";
+    spt.keaslian.tglPengesahan = tglIndo;
+    spt.keaslian.tglVerifikasi = `${tglIndo}, ${nowStr.split(' ')[1]} WIB`;
+    spt.keaslian.pejabatPengesah = approverName;
   }
+
+  spt.timeline.push({
+    waktu: nowStr,
+    aktor: approverName,
+    aksi: `Disetujui Kobag TU (Approval Tunggal Disahkan): ${spt.catatanKobagTu}`,
+    status: "approved_kobag_tu"
+  });
 
   return spt;
 };
 
-export const rejectSpt = (sptId, role, reason) => {
+export const rejectSpt = (sptId, role = 'kobag_tu', reason = '') => {
   const spt = sptList.find(s => String(s.id) === String(sptId));
   if (!spt) return null;
 
   const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
   spt.status = "ditolak";
-  spt.statusLabel = "Ditolak / Perlu Perbaikan";
+  spt.statusLabel = "Ditolak Kobag TU (Perlu Revisi Panitera)";
   spt.isApproved = false;
-  spt.catatanPenolakan = reason || "Perlu penyesuaian personil / jadwal tugas.";
+  spt.catatanPenolakan = reason || "Perlu penyesuaian personil pelaksana atau waktu penugasan dinas.";
+  
+  if (spt.keaslian) {
+    spt.keaslian.statusVerifikasi = "USULAN DITOLAK / PERLU REVISI";
+  }
+
   spt.timeline.push({
     waktu: nowStr,
-    aktor: role === 'ketimker' ? "Ketimker" : "Kobag TU",
-    aksi: `Usulan ditolak: ${spt.catatanPenolakan}`,
+    aktor: "Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)",
+    aksi: `Usulan ditolak oleh Kobag TU: ${spt.catatanPenolakan}`,
     status: "ditolak"
   });
 
@@ -508,18 +721,31 @@ export const terbitkanSpt = (sptId, nomorSpt, fileTtdName = null) => {
   const spt = sptList.find(s => String(s.id) === String(sptId));
   if (!spt) return null;
 
-  const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
+  const now = new Date();
+  const nowStr = now.toISOString().replace('T', ' ').substring(0, 16);
+  const tglIndo = now.toISOString().split('T')[0];
+
   spt.nomorSpt = nomorSpt || `B-${Math.floor(100 + Math.random() * 900)}/KP.320/H.14.7/10/2026`;
   spt.status = "terbit";
   spt.statusLabel = "SPT Terbit / Siap Cetak";
   spt.isApproved = true;
+  spt.tglPengesahan = tglIndo;
+
   if (fileTtdName) {
     spt.fileSptTtdName = fileTtdName;
   }
+
+  if (spt.keaslian) {
+    spt.keaslian.statusVerifikasi = "TERDAFTAR RESMI & TERVERIFIKASI ASLI BSRE BSSN";
+    spt.keaslian.tglPengesahan = tglIndo;
+    spt.keaslian.tglVerifikasi = `${tglIndo}, ${nowStr.split(' ')[1]} WIB`;
+    spt.keaslian.qrPayload = `https://brmp-diy.pertanian.go.id/spt/verify?id=${spt.id}&nomor=${encodeURIComponent(spt.nomorSpt)}&tgl=${tglIndo}`;
+  }
+
   spt.timeline.push({
     waktu: nowStr,
-    aktor: "Admin Sekretariat",
-    aksi: `Nomor surat dinas resmi ${spt.nomorSpt} diterbitkan & berkas ter-ttd siap cetak`,
+    aktor: "Admin Tata Persuratan & Sekretariat",
+    aksi: `Nomor surat dinas resmi ${spt.nomorSpt} diterbitkan & sertifikat QR keaslian disahkan`,
     status: "terbit"
   });
 
@@ -553,8 +779,8 @@ export const updateLaporan = (sptId, isiLaporan, fotoUrl = null, fileName = null
   const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
   spt.timeline.push({
     waktu: nowStr,
-    aktor: spt.pemohon?.nama || "Pelaksana",
-    aksi: "Laporan hasil penugasan dinas berhasil diunggah",
+    aktor: spt.pemohon?.nama || "Pelaksana Tugas",
+    aksi: "Laporan pertanggungjawaban dinas berhasil diunggah",
     status: "selesai"
   });
 

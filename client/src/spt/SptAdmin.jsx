@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiService } from '../services/api';
+import { sptApiService } from './sptApi';
 import { 
   FileCheck, 
   Settings, 
@@ -12,16 +12,26 @@ import {
   Check, 
   Upload, 
   Printer, 
-  Building 
+  Building,
+  UserCheck,
+  ShieldCheck,
+  AlertTriangle,
+  UserPlus,
+  Shield
 } from 'lucide-react';
 
 export default function SptAdmin({ user }) {
-  const [activeSubTab, setActiveSubTab] = useState('penerbitan'); // 'penerbitan' | 'menimbang' | 'dasar' | 'pegawai'
+  const [activeSubTab, setActiveSubTab] = useState('panitera'); // 'panitera' | 'penerbitan' | 'menimbang' | 'dasar' | 'pegawai'
   const [sptList, setSptList] = useState([]);
+  const [paniteraList, setPaniteraList] = useState([]);
   const [menimbangList, setMenimbangList] = useState([]);
   const [dasarList, setDasarList] = useState([]);
   const [pegawaiList, setPegawaiList] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Panitera management state
+  const [searchPegawaiPanitera, setSearchPegawaiPanitera] = useState('');
+  const [processingPanitera, setProcessingPanitera] = useState(false);
 
   // Penomoran modal/form state
   const [selectedSptToTerbit, setSelectedSptToTerbit] = useState(null);
@@ -36,9 +46,10 @@ export default function SptAdmin({ user }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [sptRes, pegRes] = await Promise.all([
-        apiService.getSpt(),
-        apiService.getPegawai()
+      const [sptRes, pegRes, panList] = await Promise.all([
+        sptApiService.getSpt(user),
+        sptApiService.getPegawai(),
+        sptApiService.getPanitera()
       ]);
 
       if (sptRes) {
@@ -49,6 +60,9 @@ export default function SptAdmin({ user }) {
       if (pegRes) {
         setPegawaiList(pegRes);
       }
+      if (panList) {
+        setPaniteraList(panList);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -58,7 +72,60 @@ export default function SptAdmin({ user }) {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
+
+  // ==========================================
+  // PANITERA MANAGEMENT ACTIONS (FLEKSIBEL)
+  // ==========================================
+  const handleAddPanitera = async (pegawai) => {
+    if (!pegawai) return;
+    setProcessingPanitera(true);
+    try {
+      const adminName = user?.nama || 'Administrator Sistem';
+      const res = await sptApiService.addPanitera(pegawai, adminName);
+      if (res.success) {
+        alert(`Pegawai ${pegawai.nama} berhasil ditetapkan sebagai Panitera SPT!`);
+        setSearchPegawaiPanitera('');
+        await loadData();
+      }
+    } catch (err) {
+      alert(err.message || 'Gagal menambahkan Panitera');
+    } finally {
+      setProcessingPanitera(false);
+    }
+  };
+
+  const handleRemovePanitera = async (panitera) => {
+    const confirmDelete = window.confirm(
+      `Apakah Anda yakin ingin mencabut peran Panitera dari ${panitera.nama}?\n\nSetelah dicabut, pegawai ini tidak lagi dapat mengajukan usulan SPT.`
+    );
+    if (!confirmDelete) return;
+
+    setProcessingPanitera(true);
+    try {
+      const res = await sptApiService.removePanitera(panitera.id || panitera.nip);
+      if (res.success) {
+        alert(`Peran Panitera dari ${panitera.nama} berhasil dicabut.`);
+        await loadData();
+      }
+    } catch (err) {
+      alert(err.message || 'Gagal menghapus Panitera');
+    } finally {
+      setProcessingPanitera(false);
+    }
+  };
+
+  // Filtered pegawai untuk penambahan Panitera
+  const candidatePegawai = pegawaiList.filter(p => {
+    const isAlreadyPanitera = paniteraList.some(pan => pan.nip === p.nip || pan.pegawaiId === p.id);
+    if (isAlreadyPanitera) return false;
+
+    if (!searchPegawaiPanitera.trim()) return true;
+    const q = searchPegawaiPanitera.toLowerCase();
+    return p.nama.toLowerCase().includes(q) || 
+           (p.nip && p.nip.includes(q)) || 
+           (p.unitKerja && p.unitKerja.toLowerCase().includes(q));
+  });
 
   // Action: Terbitkan Nomor Resmi
   const handleOpenTerbitkan = (spt) => {
@@ -72,13 +139,13 @@ export default function SptAdmin({ user }) {
     if (!selectedSptToTerbit || !nomorSptInput.trim()) return;
 
     try {
-      const res = await apiService.terbitkanSpt(selectedSptToTerbit.id, {
+      const res = await sptApiService.terbitkanSpt(selectedSptToTerbit.id, {
         nomorSpt: nomorSptInput.trim(),
         fileTtdName: fileTtdName || `SPT_${selectedSptToTerbit.id}_resmi_ttd.pdf`
       });
 
       if (res.success) {
-        alert('Nomor dinas resmi berhasil diterbitkan! SPT siap dicetak.');
+        alert('Nomor dinas resmi berhasil diterbitkan dengan QR Keaslian tervalidasi!');
         setSelectedSptToTerbit(null);
         await loadData();
       }
@@ -100,7 +167,7 @@ export default function SptAdmin({ user }) {
 
   const handleSaveAllMenimbang = async () => {
     try {
-      const res = await apiService.saveMenimbang(menimbangList);
+      const res = await sptApiService.saveMenimbang(menimbangList);
       if (res.success) {
         alert('Konsiderans Menimbang resmi berhasil disimpan!');
       }
@@ -122,141 +189,215 @@ export default function SptAdmin({ user }) {
 
   const handleSaveAllDasar = async () => {
     try {
-      const res = await apiService.saveDasar(dasarList);
+      const res = await sptApiService.saveDasar(dasarList);
       if (res.success) {
         alert('Konsiderans Dasar Hukum resmi berhasil disimpan!');
       }
     } catch (err) {
-      alert(err.message || 'Gagal menyimpan Dasar Hukum');
+      alert(err.message || 'Gagal menyimpan konsiderans Dasar Hukum');
     }
   };
 
-  // List ready for number issuance
-  const readyForNumber = sptList.filter(s => s.status === 'approved_kobag_tu' || s.status === 'terbit');
-
-  const filteredPegawai = pegawaiList.filter(p => 
-    p.nama.toLowerCase().includes(searchPegawai.toLowerCase()) ||
-    (p.nip && p.nip.includes(searchPegawai)) ||
-    (p.unitKerja && p.unitKerja.toLowerCase().includes(searchPegawai.toLowerCase())) ||
-    (p.jabatan && p.jabatan.toLowerCase().includes(searchPegawai.toLowerCase()))
-  );
+  // Filter pending terbit
+  const readyToIssueSpt = sptList.filter(s => s.status === 'approved_kobag_tu' || !s.nomorSpt);
 
   return (
     <div className="spt-module-container">
-      {/* Header */}
+      {/* Header Banner */}
       <div className="breadcrumb-banner no-print">
         <div>
           <h1 className="breadcrumb-title">
-            <Settings size={24} style={{ color: 'var(--primary-600)' }} />
-            <span>Pusat Administrasi & Tata Naskah Sekretariat BRMP DIY</span>
+            <FileCheck size={24} style={{ color: 'var(--primary-600)' }} />
+            <span>Administrasi SPT & Pengelolaan Role Panitera</span>
           </h1>
           <div className="breadcrumb-path">
             <span>KITA BRMP DIY</span>
             <span>/</span>
             <span>SPT Digital</span>
             <span>/</span>
-            <span className="current">Sekretariat: Penomoran Resmi, Menimbang, Dasar & Database</span>
+            <span className="current">Pengaturan Fleksibel Panitera, Nomor Resmi & Konsiderans</span>
           </div>
         </div>
       </div>
 
+      {/* Tabs Menu Nav */}
       <div className="card mb-4">
-        {/* Navigation Tabs */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '8px 16px', gap: '8px', borderRadius: '12px 12px 0 0' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '8px 16px', gap: '8px', borderRadius: '12px 12px 0 0', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setActiveSubTab('panitera')}
+            className={`btn ${activeSubTab === 'panitera' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <UserCheck size={16} />
+            <span>1. Kelola Role Panitera (Fleksibel)</span>
+            <span style={{ background: activeSubTab === 'panitera' ? 'var(--primary-700)' : '#e2e8f0', color: activeSubTab === 'panitera' ? '#fff' : '#475569', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+              {paniteraList.length}
+            </span>
+          </button>
+
           <button
             onClick={() => setActiveSubTab('penerbitan')}
             className={`btn ${activeSubTab === 'penerbitan' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <FileCheck size={16} />
-            <span>1. Penomoran & Terbitkan SPT ({readyForNumber.length})</span>
+            <Printer size={16} />
+            <span>2. Penomoran Dinas & Cetak</span>
+            <span style={{ background: activeSubTab === 'penerbitan' ? 'var(--primary-700)' : '#e2e8f0', color: activeSubTab === 'penerbitan' ? '#fff' : '#475569', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+              {readyToIssueSpt.length}
+            </span>
           </button>
+
           <button
             onClick={() => setActiveSubTab('menimbang')}
             className={`btn ${activeSubTab === 'menimbang' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Scale size={16} />
-            <span>2. Update Menimbang ({menimbangList.length})</span>
+            <span>3. Konsiderans Menimbang</span>
           </button>
+
           <button
             onClick={() => setActiveSubTab('dasar')}
             className={`btn ${activeSubTab === 'dasar' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <BookOpen size={16} />
-            <span>3. Update Dasar Hukum ({dasarList.length})</span>
+            <span>4. Dasar Hukum</span>
           </button>
+
           <button
             onClick={() => setActiveSubTab('pegawai')}
             className={`btn ${activeSubTab === 'pegawai' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Users size={16} />
-            <span>4. Database 115 Pegawai</span>
+            <span>5. Master Pegawai (115)</span>
           </button>
         </div>
 
-        {/* TAB 1: PENERBITAN & PENOMORAN RESMI */}
-        {activeSubTab === 'penerbitan' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0', color: '#0f172a' }}>
-                Daftar SPT Siap Terbit & Penomoran Naskah Dinas Resmi
-              </h3>
-              <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
-                Setelah disetujui Kobag TU, Sekretariat menginput nomor surat dinas resmi, mencetak naskah dinas, dan mengesahkan status Terbit.
+        {/* ======================================================== */}
+        {/* SUBTAB 1: KELOLA ROLE PANITERA FLEKSIBEL                */}
+        {/* ======================================================== */}
+        {activeSubTab === 'panitera' && (
+          <div style={{ padding: '24px' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ShieldCheck size={22} color="var(--primary-600)" />
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                  Pengaturan Fleksibel Peran Panitera SPT
+                </h3>
+              </div>
+              <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>
+                Panitera adalah pegawai yang memiliki wewenang khusus untuk menyusun dan mengajukan permohonan Surat Perintah Tugas (SPT).
+                Sebagai Administrator, Anda dapat <strong>menambah pegawai menjadi Panitera</strong> atau <strong>mencabut peran Panitera</strong> kapan saja sesuai kebutuhan rotasi penugasan.
               </p>
             </div>
 
-            <div className="table-responsive">
-              <table className="app-table">
-                <thead>
+            {/* Form Tambah Panitera */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px', marginBottom: '24px' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UserPlus size={16} color="var(--primary-600)" />
+                <span>Tambah Pegawai Baru Sebagai Panitera SPT</span>
+              </h4>
+
+              <div style={{ position: 'relative', maxWidth: '480px', marginBottom: '12px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input 
+                  type="text"
+                  className="form-control"
+                  placeholder="Cari pegawai berdasarkan nama atau NIP..."
+                  value={searchPegawaiPanitera}
+                  onChange={(e) => setSearchPegawaiPanitera(e.target.value)}
+                  style={{ paddingLeft: '36px' }}
+                />
+              </div>
+
+              {/* Kandidat Pegawai Dropdown / Quick Select */}
+              <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '8px', background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                {candidatePegawai.slice(0, 16).map(peg => (
+                  <button
+                    key={peg.nip}
+                    type="button"
+                    onClick={() => handleAddPanitera(peg)}
+                    disabled={processingPanitera}
+                    style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #86efac',
+                      color: '#166534',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontWeight: 600
+                    }}
+                    title="Klik untuk mengangkat menjadi Panitera"
+                  >
+                    <span>+ {peg.nama}</span>
+                    <span style={{ fontSize: '10px', color: '#15803d', opacity: 0.8 }}>({peg.nip})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tabel Daftar Panitera Aktif */}
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+              <div style={{ background: '#f8fafc', padding: '12px 18px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: '13.5px', color: '#1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Daftar Panitera Aktif Saat Ini ({paniteraList.length} Orang)</span>
+                <span style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: 600 }}>● Sinkronisasi Real-Time</span>
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
                   <tr>
-                    <th>ID / Nomor Surat</th>
-                    <th>Klasifikasi & Lokasi</th>
-                    <th>Jadwal Penugasan</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'center' }}>Aksi Sekretariat</th>
+                    <th style={{ padding: '10px 16px', width: '30px' }}>No</th>
+                    <th style={{ padding: '10px 16px' }}>Nama & NIP Panitera</th>
+                    <th style={{ padding: '10px 16px' }}>Jabatan & Unit Kerja</th>
+                    <th style={{ padding: '10px 16px' }}>Tanggal Penetapan</th>
+                    <th style={{ padding: '10px 16px' }}>Ditugaskan Oleh</th>
+                    <th style={{ padding: '10px 16px', textAlign: 'center' }}>Aksi Administrator</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {readyForNumber.map((spt) => (
-                    <tr key={spt.id}>
-                      <td>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>
-                          {spt.nomorSpt || `Draft #${spt.id}`}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>
-                          Pemohon: {spt.pemohon?.nama || 'Pegawai'}
-                        </div>
+                  {paniteraList.map((pan, idx) => (
+                    <tr key={pan.id || pan.nip} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 16px', color: '#64748b' }}>{idx + 1}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{pan.nama}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>NIP. {pan.nip}</div>
                       </td>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: '12.5px' }}>{spt.klasifikasiNama || 'Tugas'}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>{spt.tempatTujuan || spt.tujuanDaerah}</div>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ color: '#334155' }}>{pan.jabatan}</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b' }}>{pan.unitKerja}</div>
                       </td>
-                      <td>
-                        <div style={{ fontSize: '12px', fontWeight: 600 }}>{spt.tanggalSpt || spt.tglMulai}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{spt.lamaHari || `${spt.durasiHari || 1} hari`}</div>
+                      <td style={{ padding: '12px 16px', color: '#475569' }}>
+                        {pan.tglDitugaskan || '2026-10-01'}
                       </td>
-                      <td>
-                        {spt.status === 'terbit' ? (
-                          <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>
-                            ✓ Terbit & Siap Cetak
-                          </span>
-                        ) : (
-                          <span style={{ background: '#f3e8ff', color: '#7e22ce', border: '1px solid #e9d5ff', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>
-                            Siap Input Nomor
-                          </span>
-                        )}
+                      <td style={{ padding: '12px 16px', color: '#475569' }}>
+                        {pan.ditugaskanOleh || 'Administrator'}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => handleOpenTerbitkan(spt)}
-                          style={{ fontSize: '11.5px', padding: '5px 10px' }}
+                          type="button"
+                          onClick={() => handleRemovePanitera(pan)}
+                          disabled={processingPanitera}
+                          className="btn btn-secondary"
+                          style={{
+                            background: '#fee2e2',
+                            borderColor: '#fca5a5',
+                            color: '#b91c1c',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          title="Cabut peran Panitera dari pegawai ini"
                         >
-                          {spt.status === 'terbit' ? '✏️ Edit Nomor / Berkas' : '⚡ Input Nomor & Sahkan'}
+                          <Trash2 size={13} />
+                          <span>Cabut Role Panitera</span>
                         </button>
                       </td>
                     </tr>
@@ -267,251 +408,294 @@ export default function SptAdmin({ user }) {
           </div>
         )}
 
-        {/* TAB 2: UPDATE MENIMBANG */}
-        {activeSubTab === 'menimbang' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0', color: '#0f172a' }}>
-                  Pengaturan Konsiderans Menimbang Resmi
-                </h3>
-                <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
-                  Butir-butir pertimbangan resmi yang otomatis tercetak pada bagian <strong>Menimbang</strong> naskah dinas SPT (a, b, c...).
-                </p>
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={handleSaveAllMenimbang}>
-                💾 Simpan Perubahan Menimbang
-              </button>
-            </div>
+        {/* ======================================================== */}
+        {/* SUBTAB 2: PENOMORAN RESMI & TERBITKAN                   */}
+        {/* ======================================================== */}
+        {activeSubTab === 'penerbitan' && (
+          <div style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+              Penerbitan Nomor Resmi Naskah Dinas SPT (Tata Persuratan)
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b' }}>
+              Setelah usulan SPT disetujui Kobag TU, Admin Sekretariat memberikan nomor surat resmi sesuai klasifikasi agenda persuratan dinas.
+            </p>
 
-            {/* List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-              {menimbangList.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--primary-700)', minWidth: '24px' }}>
-                    {String.fromCharCode(97 + idx)}.
-                  </span>
-                  <input 
-                    type="text" 
-                    className="form-control"
-                    value={item}
-                    onChange={(e) => {
-                      const updated = [...menimbangList];
-                      updated[idx] = e.target.value;
-                      setMenimbangList(updated);
-                    }}
-                    style={{ fontSize: '13px' }}
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => handleRemoveMenimbang(idx)}
-                    title="Hapus butir"
-                    style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Add New Item */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input 
-                type="text" 
-                className="form-control"
-                placeholder="Tambah butir pertimbangan Menimbang baru (contoh: bahwa dalam rangka optimalisasi...)..."
-                value={newMenimbangItem}
-                onChange={(e) => setNewMenimbangItem(e.target.value)}
-                style={{ fontSize: '13px' }}
-              />
-              <button className="btn btn-secondary" onClick={handleAddMenimbang} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Plus size={16} />
-                <span>Tambah</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: UPDATE DASAR HUKUM */}
-        {activeSubTab === 'dasar' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0', color: '#0f172a' }}>
-                  Pengaturan Landasan Hukum Dasar
-                </h3>
-                <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
-                  Peraturan perundang-undangan dan DIPA yang otomatis tercetak pada bagian <strong>Dasar</strong> naskah dinas SPT (1, 2, 3...).
-                </p>
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={handleSaveAllDasar}>
-                💾 Simpan Perubahan Dasar Hukum
-              </button>
-            </div>
-
-            {/* List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-              {dasarList.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--primary-700)', minWidth: '24px' }}>
-                    {idx + 1}.
-                  </span>
-                  <input 
-                    type="text" 
-                    className="form-control"
-                    value={item}
-                    onChange={(e) => {
-                      const updated = [...dasarList];
-                      updated[idx] = e.target.value;
-                      setDasarList(updated);
-                    }}
-                    style={{ fontSize: '13px' }}
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => handleRemoveDasar(idx)}
-                    title="Hapus dasar hukum"
-                    style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Add New Item */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input 
-                type="text" 
-                className="form-control"
-                placeholder="Tambah butir peraturan / DIPA baru (contoh: Peraturan Menteri Pertanian Nomor...)..."
-                value={newDasarItem}
-                onChange={(e) => setNewDasarItem(e.target.value)}
-                style={{ fontSize: '13px' }}
-              />
-              <button className="btn btn-secondary" onClick={handleAddDasar} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Plus size={16} />
-                <span>Tambah</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: DATABASE 115 PEGAWAI */}
-        {activeSubTab === 'pegawai' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0', color: '#0f172a' }}>
-                  Database Personil Balai Penerapan Standar Instrumen Pertanian DIY ({pegawaiList.length} Pegawai)
-                </h3>
-                <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
-                  Referensi master data kepegawaian BRMP DIY untuk penugasan Surat Perintah Tugas digital.
-                </p>
-              </div>
-
-              <div style={{ position: 'relative', width: '280px' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8' }} />
-                <input 
-                  type="text" 
-                  className="form-control"
-                  placeholder="🔍 Cari nama, NIP, atau jabatan..."
-                  value={searchPegawai}
-                  onChange={(e) => setSearchPegawai(e.target.value)}
-                  style={{ paddingLeft: '36px', fontSize: '13px' }}
-                />
-              </div>
-            </div>
-
-            <div className="table-responsive" style={{ maxHeight: '520px', overflowY: 'auto' }}>
-              <table className="app-table">
-                <thead>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
                   <tr>
-                    <th style={{ width: '40px' }}>No.</th>
-                    <th>Nama & Gelar Pegawai</th>
-                    <th>NIP</th>
-                    <th>Golongan</th>
-                    <th>Jabatan Kedinasan</th>
-                    <th>Unit / Tim Kerja</th>
+                    <th style={{ padding: '10px 16px' }}>ID SPT</th>
+                    <th style={{ padding: '10px 16px' }}>Uraian Penugasan</th>
+                    <th style={{ padding: '10px 16px' }}>Tujuan & Jadwal</th>
+                    <th style={{ padding: '10px 16px' }}>Nomor SPT Saat Ini</th>
+                    <th style={{ padding: '10px 16px' }}>Status Persetujuan</th>
+                    <th style={{ padding: '10px 16px', textAlign: 'center' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPegawai.slice(0, 50).map((peg, idx) => (
-                    <tr key={peg.id || peg.nip}>
-                      <td style={{ textAlign: 'center' }}>{idx + 1}.</td>
-                      <td style={{ fontWeight: 600 }}>{peg.nama}</td>
-                      <td style={{ fontFamily: 'monospace' }}>{peg.nip || '-'}</td>
-                      <td style={{ textAlign: 'center' }}>{peg.golongan || '-'}</td>
-                      <td>{peg.jabatan || '-'}</td>
-                      <td style={{ fontSize: '12px', color: '#64748b' }}>{peg.unitKerja || '-'}</td>
+                  {sptList.map((spt) => (
+                    <tr key={spt.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#64748b' }}>{spt.id}</td>
+                      <td style={{ padding: '10px 16px', maxWidth: '280px' }}>
+                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{spt.uraian}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>Diajukan: {spt.paniteraPengaju?.nama || 'Panitera'}</div>
+                      </td>
+                      <td style={{ padding: '10px 16px' }}>
+                        <div>{spt.tujuanDaerah}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>{spt.tanggalSpt}</div>
+                      </td>
+                      <td style={{ padding: '10px 16px' }}>
+                        {spt.nomorSpt ? (
+                          <span style={{ fontWeight: 700, color: '#0f172a' }}>{spt.nomorSpt}</span>
+                        ) : (
+                          <span style={{ color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>
+                            Belum Diberi Nomor
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px 16px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: spt.isApproved ? '#16a34a' : '#b45309' }}>
+                          {spt.statusLabel}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTerbitkan(spt)}
+                          className="btn btn-primary"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                          {spt.nomorSpt ? 'Ubah Nomor' : 'Terbitkan Nomor'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '8px' }}>
-              Menampilkan {Math.min(filteredPegawai.length, 50)} dari {filteredPegawai.length} personil terdaftar.
+
+            {/* Modal Terbitkan Nomor */}
+            {selectedSptToTerbit && (
+              <div 
+                className="modal-backdrop"
+                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
+                onClick={() => setSelectedSptToTerbit(null)}
+              >
+                <div 
+                  style={{ background: '#fff', borderRadius: '12px', maxWidth: '500px', width: '100%', padding: '24px' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: 700 }}>
+                    Terbitkan Nomor Naskah Resmi ({selectedSptToTerbit.id})
+                  </h3>
+                  <form onSubmit={submitTerbitkan}>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Nomor Surat Perintah Tugas Resmi:
+                      </label>
+                      <input 
+                        type="text"
+                        className="form-control"
+                        value={nomorSptInput}
+                        onChange={(e) => setNomorSptInput(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div style={{ marginBottom: '18px' }}>
+                      <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Nama Berkas Naskah Digital Ter-TTD:
+                      </label>
+                      <input 
+                        type="text"
+                        className="form-control"
+                        placeholder="Contoh: SPT_Resmi_B-142_Kementan_ttd.pdf"
+                        value={fileTtdName}
+                        onChange={(e) => setFileTtdName(e.target.value)}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setSelectedSptToTerbit(null)}>
+                        Batal
+                      </button>
+                      <button type="submit" className="btn btn-primary">
+                        Simpan & Terbitkan
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* SUBTAB 3: MENIMBANG                                     */}
+        {/* ======================================================== */}
+        {activeSubTab === 'menimbang' && (
+          <div style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+              Konsiderans Menimbang Resmi
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+              Poin-poin pertimbangan formal yang dicantumkan dalam naskah dinas resmi SPT BRMP DIY.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+              {menimbangList.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontWeight: 700, color: '#475569' }}>{idx + 1}.</span>
+                  <div style={{ flex: 1, fontSize: '13px', color: '#1e293b' }}>{item}</div>
+                  <button 
+                    type="button"
+                    onClick={() => handleRemoveMenimbang(idx)}
+                    style={{ background: '#fee2e2', border: 'none', color: '#ef4444', padding: '4px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <input 
+                type="text"
+                className="form-control"
+                placeholder="Tambahkan poin menimbang baru..."
+                value={newMenimbangItem}
+                onChange={(e) => setNewMenimbangItem(e.target.value)}
+              />
+              <button type="button" onClick={handleAddMenimbang} className="btn btn-secondary">
+                Tambah
+              </button>
+            </div>
+
+            <button type="button" onClick={handleSaveAllMenimbang} className="btn btn-primary">
+              Simpan Konsiderans Menimbang
+            </button>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* SUBTAB 4: DASAR HUKUM                                   */}
+        {/* ======================================================== */}
+        {activeSubTab === 'dasar' && (
+          <div style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+              Konsiderans Dasar Hukum
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+              Regulasi hukum dan pedoman peraturan yang menjadi dasar pelaksanaan tugas kedinasan.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+              {dasarList.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontWeight: 700, color: '#475569' }}>{idx + 1}.</span>
+                  <div style={{ flex: 1, fontSize: '13px', color: '#1e293b' }}>{item}</div>
+                  <button 
+                    type="button"
+                    onClick={() => handleRemoveDasar(idx)}
+                    style={{ background: '#fee2e2', border: 'none', color: '#ef4444', padding: '4px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <input 
+                type="text"
+                className="form-control"
+                placeholder="Tambahkan dasar hukum baru..."
+                value={newDasarItem}
+                onChange={(e) => setNewDasarItem(e.target.value)}
+              />
+              <button type="button" onClick={handleAddDasar} className="btn btn-secondary">
+                Tambah
+              </button>
+            </div>
+
+            <button type="button" onClick={handleSaveAllDasar} className="btn btn-primary">
+              Simpan Dasar Hukum
+            </button>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* SUBTAB 5: MASTER 115 PEGAWAI BRMP DIY                   */}
+        {/* ======================================================== */}
+        {activeSubTab === 'pegawai' && (
+          <div style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                Master Data Pegawai BRMP DIY ({pegawaiList.length} ASN/PPPK)
+              </h3>
+              <div style={{ position: 'relative', width: '280px' }}>
+                <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input 
+                  type="text"
+                  className="form-control"
+                  placeholder="Cari pegawai..."
+                  value={searchPegawai}
+                  onChange={(e) => setSearchPegawai(e.target.value)}
+                  style={{ paddingLeft: '32px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                  <tr>
+                    <th style={{ padding: '10px 14px' }}>ID</th>
+                    <th style={{ padding: '10px 14px' }}>Nama & NIP</th>
+                    <th style={{ padding: '10px 14px' }}>Jabatan</th>
+                    <th style={{ padding: '10px 14px' }}>Gol</th>
+                    <th style={{ padding: '10px 14px' }}>Unit Kerja</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'center' }}>Status Panitera</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pegawaiList
+                    .filter(p => !searchPegawai || p.nama.toLowerCase().includes(searchPegawai.toLowerCase()) || (p.nip && p.nip.includes(searchPegawai)))
+                    .slice(0, 30)
+                    .map((p) => {
+                      const isPan = paniteraList.some(pan => pan.nip === p.nip || pan.pegawaiId === p.id);
+                      return (
+                        <tr key={p.id || p.nip} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: '#64748b' }}>{p.id}</td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{p.nama}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>NIP. {p.nip}</div>
+                          </td>
+                          <td style={{ padding: '10px 14px' }}>{p.jabatan}</td>
+                          <td style={{ padding: '10px 14px' }}>{p.golongan || '-'}</td>
+                          <td style={{ padding: '10px 14px', fontSize: '12px', color: '#475569' }}>{p.unitKerja}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                            {isPan ? (
+                              <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+                                Panitera Aktif
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAddPanitera(p)}
+                                style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}
+                              >
+                                + Jadikan Panitera
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
       </div>
-
-      {/* MODAL INPUT NOMOR SURAT RESMI */}
-      {selectedSptToTerbit && (
-        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-dialog" style={{ maxWidth: '520px', width: '90%', background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
-            <div className="modal-header" style={{ padding: '16px 20px', background: '#1e293b', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '15px', color: '#fff', fontWeight: 600 }}>
-                Input Nomor Surat Dinas Resmi & Sahkan SPT
-              </h3>
-              <button onClick={() => setSelectedSptToTerbit(null)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '20px', cursor: 'pointer' }}>&times;</button>
-            </div>
-
-            <form onSubmit={submitTerbitkan}>
-              <div className="modal-body" style={{ padding: '20px' }}>
-                <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
-                  Input nomor surat dinas resmi Kementerian Pertanian sesuai buku agenda sekretariat BRMP DIY.
-                </p>
-
-                <div className="form-group mb-3">
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '13px' }}>
-                    Nomor Surat Dinas Resmi <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    className="form-control"
-                    value={nomorSptInput}
-                    onChange={(e) => setNomorSptInput(e.target.value)}
-                    placeholder="Contoh: B-145/KP.320/H.14.7/10/2026"
-                    required
-                  />
-                  <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px' }}>
-                    Format naskah dinas standar Kementan: B-[No]/KP.320/H.14.7/[Bulan]/[Tahun]
-                  </div>
-                </div>
-
-                <div className="form-group mb-3">
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '13px' }}>
-                    Nama File Scan/Berkas Ter-TTD (Opsional)
-                  </label>
-                  <input 
-                    type="text" 
-                    className="form-control"
-                    value={fileTtdName}
-                    onChange={(e) => setFileTtdName(e.target.value)}
-                    placeholder="Contoh: SPT_Resmi_B-145_Kementan_BRMP_ttd.pdf"
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer" style={{ padding: '12px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setSelectedSptToTerbit(null)}>Batal</button>
-                <button type="submit" className="btn btn-primary">Sah & Terbitkan SPT</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
