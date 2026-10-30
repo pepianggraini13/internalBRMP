@@ -3,7 +3,11 @@ import {
   instansiSettings, 
   updateInstansiSettings, 
   disposisiList,
-  agendaList
+  agendaList,
+  adminPaniteraList,
+  adminSptList,
+  adminMenimbangList,
+  adminDasarList
 } from './adminStore.js';
 import { users, cutiHistory } from '../data/store.js';
 import { admsLogs, admsMachines } from '../routes/adms.js';
@@ -56,8 +60,8 @@ router.get('/summary', (req, res) => {
           subRight: 'Tahun 2026'
         },
         suratPerintahTugas: {
-          value: 3,
-          displayNumber: 3,
+          value: adminSptList.length,
+          displayNumber: adminSptList.length,
           label: 'SURAT PERINTAH TUGAS',
           subLeft: '📍 Sleman & Kulon Progo',
           subRight: 'Dinas Lapangan'
@@ -199,6 +203,84 @@ router.put('/settings', (req, res) => {
     success: true,
     message: 'Pengaturan instansi berhasil disimpan',
     data: updated
+  });
+});
+
+// ==========================================
+// ADMIN SPT & PANITERA ENDPOINTS
+// ==========================================
+
+// GET /api/admin/spt
+router.get('/spt', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      sptList: adminSptList,
+      paniteraList: adminPaniteraList,
+      menimbang: adminMenimbangList,
+      dasar: adminDasarList
+    }
+  });
+});
+
+// POST /api/admin/spt/panitera
+router.post('/spt/panitera', (req, res) => {
+  const { nip, nama, jabatan } = req.body;
+  if (!nip || !nama) {
+    return res.status(400).json({ success: false, message: 'NIP dan Nama wajib disertakan' });
+  }
+
+  const existing = adminPaniteraList.find(p => p.nip === nip);
+  if (existing) {
+    return res.json({ success: true, message: 'Pegawai sudah terdaftar sebagai Panitera', data: existing });
+  }
+
+  const newPan = {
+    id: `PEG-${nip.slice(-3)}`,
+    nip,
+    nama,
+    jabatan: jabatan || 'Pegawai Balai',
+    role: 'Panitera SPT',
+    assignedBy: req.body.assignedBy || 'Administrator Sistem',
+    assignedAt: new Date().toISOString().split('T')[0]
+  };
+
+  adminPaniteraList.unshift(newPan);
+  res.status(201).json({
+    success: true,
+    message: `Pegawai ${nama} berhasil ditetapkan sebagai Panitera SPT`,
+    data: newPan
+  });
+});
+
+// DELETE /api/admin/spt/panitera/:id
+router.delete('/spt/panitera/:id', (req, res) => {
+  const { id } = req.params;
+  const idx = adminPaniteraList.findIndex(p => p.id === id || p.nip === id);
+  if (idx !== -1) {
+    const removed = adminPaniteraList.splice(idx, 1)[0];
+    return res.json({ success: true, message: `Peran Panitera dari ${removed.nama} berhasil dicabut` });
+  }
+  res.status(404).json({ success: false, message: 'Panitera tidak ditemukan' });
+});
+
+// POST /api/admin/spt/terbitkan
+router.post('/spt/terbitkan', (req, res) => {
+  const { id, nomorSpt } = req.body;
+  const spt = adminSptList.find(s => s.id === id);
+  if (!spt) {
+    return res.status(404).json({ success: false, message: 'SPT tidak ditemukan' });
+  }
+
+  spt.nomorSpt = nomorSpt;
+  spt.status = 'published';
+  spt.diterbitkanAt = new Date().toLocaleString('id-ID');
+  spt.hasQr = true;
+
+  res.json({
+    success: true,
+    message: `Nomor dinas ${nomorSpt} berhasil diterbitkan`,
+    data: spt
   });
 });
 

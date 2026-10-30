@@ -47,7 +47,12 @@ import {
   WifiOff,
   Activity,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Printer,
+  QrCode,
+  Briefcase,
+  Layers,
+  Award
 } from 'lucide-react';
 import { apiService, getStoredAvatar, setStoredAvatar } from '../services/api';
 import CutiFormulirBkn from '../components/CutiFormulirBkn';
@@ -291,6 +296,128 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
   const [actionLoadingCuti, setActionLoadingCuti] = useState(false);
   const [cutiAlert, setCutiAlert] = useState({ type: '', message: '' });
 
+  // ========================================================
+  // TAB E: ADMINISTRASI SPT & PANITERA STATE (FLEKSIBEL)
+  // ========================================================
+  const [sptSubTab, setSptSubTab] = useState('panitera'); // 'panitera' | 'penomoran' | 'konsiderans' | 'monitoring'
+  const [sptPaniteraList, setSptPaniteraList] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('brmp_admin_panitera');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      { id: 'PEG-004', nip: '198906012015032004', nama: 'Devi Eka Nuvitasari, S.H.', jabatan: 'Analis SDM Aparatur', role: 'Panitera SPT', assignedBy: 'Administrator Sistem', assignedAt: '10/01/2026' },
+      { id: 'PEG-017', nip: '199111042023212041', nama: 'Siti Rahmawati, S.P.', jabatan: 'Penyuluh Pertanian Pertama', role: 'Panitera SPT', assignedBy: 'Administrator Sistem', assignedAt: '15/02/2026' }
+    ];
+  });
+  const [searchPaniteraQuery, setSearchPaniteraQuery] = useState('');
+  const [selectedCandidateNip, setSelectedCandidateNip] = useState('');
+  const [candidateFilterQuery, setCandidateFilterQuery] = useState('');
+  const [sptAlertMsg, setSptAlertMsg] = useState({ type: '', text: '' });
+
+  // SPT Records List
+  const [sptRecordsList, setSptRecordsList] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('brmp_admin_spt_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      {
+        id: 'SPT-2026-001',
+        nomorSpt: 'B-101/KP.320/H.14.7/10/2026',
+        kegiatan: 'Koordinasi Lapangan Standardisasi Instrumen Pertanian Modern di Kab. Sleman',
+        tujuan: 'Dinas Pertanian Kab. Sleman & BPP Minggir',
+        tglMulai: '2026-10-28',
+        tglSelesai: '2026-10-29',
+        durasi: '2 Hari',
+        status: 'published',
+        pemohon: 'Devi Eka Nuvitasari, S.H.',
+        peserta: ['Dr. Soeharsono, S.Pt, M.Si', 'Devi Eka Nuvitasari, S.H.', 'Romy Husodo'],
+        disetujuiOleh: 'Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)',
+        diterbitkanAt: '27/10/2026 14:20 WIB',
+        hasQr: true
+      },
+      {
+        id: 'SPT-2026-002',
+        nomorSpt: 'B-102/KP.320/H.14.7/10/2026',
+        kegiatan: 'Monitoring Penerapan SOP Varietas Padi Unggul Ramah Lingkungan',
+        tujuan: 'Kelompok Tani Makmur Mandiri, Kab. Kulon Progo',
+        tglMulai: '2026-10-30',
+        tglSelesai: '2026-10-31',
+        durasi: '2 Hari',
+        status: 'published',
+        pemohon: 'Siti Rahmawati, S.P.',
+        peserta: ['Siti Rahmawati, S.P.', 'Triyana Handayani, A.Md'],
+        disetujuiOleh: 'Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)',
+        diterbitkanAt: '29/10/2026 09:15 WIB',
+        hasQr: true
+      },
+      {
+        id: 'SPT-2026-003',
+        nomorSpt: '',
+        kegiatan: 'Supervisi Akreditasi Laboratorium Pengujian Benih Pertanian Terstandar',
+        tujuan: 'Balai Standardisasi Pengujian Benih, Surakarta',
+        tglMulai: '2026-11-03',
+        tglSelesai: '2026-11-05',
+        durasi: '3 Hari',
+        status: 'ready_to_issue',
+        pemohon: 'Devi Eka Nuvitasari, S.H.',
+        peserta: ['Dr. Soeharsono, S.Pt, M.Si', 'Dwi Dinia Rahayu, S.Kom, M.T.I'],
+        disetujuiOleh: 'Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)',
+        diterbitkanAt: '-',
+        hasQr: false
+      }
+    ];
+  });
+
+  const [searchSptQuery, setSearchSptQuery] = useState('');
+  const [filterSptStatus, setFilterSptStatus] = useState('ALL');
+  const [modalTerbitSpt, setModalTerbitSpt] = useState(null);
+  const [inputNomorSpt, setInputNomorSpt] = useState('');
+  const [selectedSptDetail, setSelectedSptDetail] = useState(null);
+
+  // Konsiderans Menimbang & Dasar
+  const [menimbangList, setMenimbangList] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('brmp_admin_menimbang');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      'Bahwa dalam rangka optimalisasi koordinasi standardisasi instrumen pertanian terpadu di Provinsi Daerah Istimewa Yogyakarta, dipandang perlu menugaskan pegawai yang tercantum dalam surat perintah ini.',
+      'Bahwa pegawai yang namanya tercantum dalam keputusan ini dipandang cakap dan memenuhi syarat untuk melaksanakan tugas kedinasan dimaksud.'
+    ];
+  });
+  const [newMenimbangItem, setNewMenimbangItem] = useState('');
+
+  const [dasarList, setDasarList] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('brmp_admin_dasar');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      'Undang-Undang Nomor 20 Tahun 2023 tentang Aparatur Sipil Negara.',
+      'Peraturan Menteri Pertanian Republik Indonesia Nomor 19 Tahun 2023 tentang Organisasi dan Tata Kerja Balai Besar Penerapan Standar Instrumen Pertanian.',
+      'Daftar Isian Pelaksanaan Anggaran (DIPA) Balai Besar Penerapan Modernisasi Pertanian DIY Tahun Anggaran 2026.'
+    ];
+  });
+  const [newDasarItem, setNewDasarItem] = useState('');
+
   // Ticking Clock
   useEffect(() => {
     const updateTime = () => {
@@ -420,27 +547,169 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
     loadAllData();
   }, []);
 
-  // Sync initial tab when props change
+  // Sync initial tab when props change & listen for tab change events
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    const handleTabChange = (e) => {
+      if (e?.detail) {
+        setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener('brmp-admin-tab-change', handleTabChange);
+    const saved = sessionStorage.getItem('brmp_admin_tab');
+    if (saved === 'spt') {
+      setActiveTab('spt');
+    }
+    return () => window.removeEventListener('brmp-admin-tab-change', handleTabChange);
   }, [initialTab]);
 
   const handleTabSwitch = (tab) => {
     setActiveTab(tab);
-    if (onNavigate) {
-      if (tab === 'dashboard') {
+    window.dispatchEvent(new CustomEvent('brmp-admin-tab-change', { detail: tab }));
+    if (tab === 'spt') {
+      sessionStorage.setItem('brmp_admin_tab', 'spt');
+      if (onNavigate) {
         onNavigate('admin-dashboard');
-      } else {
-        onNavigate(`admin-${tab}`);
+      }
+    } else {
+      sessionStorage.removeItem('brmp_admin_tab');
+      if (onNavigate) {
+        if (tab === 'dashboard') {
+          onNavigate('admin-dashboard');
+        } else {
+          onNavigate(`admin-${tab}`);
+        }
       }
     }
     window.scrollTo({ top: 0, behavior: 'instant' });
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 10);
+  };
+
+  // Panitera Actions
+  const handleAddPanitera = () => {
+    if (!selectedCandidateNip) {
+      setSptAlertMsg({ type: 'error', text: 'Pilih pegawai terlebih dahulu dari daftar calon Panitera.' });
+      return;
+    }
+    const emp = usersList.find(u => String(u.nip) === String(selectedCandidateNip) || String(u.id) === String(selectedCandidateNip));
+    if (!emp) return;
+
+    if (sptPaniteraList.some(p => String(p.nip) === String(emp.nip) || String(p.id) === String(emp.id))) {
+      setSptAlertMsg({ type: 'warning', text: `Pegawai ${emp.nama} sudah berstatus sebagai Panitera SPT.` });
+      return;
+    }
+
+    const todayStr = new Date().toLocaleDateString('id-ID');
+    const newPanitera = {
+      id: emp.id || `PEG-${emp.nip?.slice(-3) || '999'}`,
+      nip: emp.nip,
+      nama: emp.nama,
+      jabatan: emp.jabatan || 'Staf Balai',
+      role: 'Panitera SPT',
+      assignedBy: user?.nama || 'Administrator Sistem',
+      assignedAt: todayStr
+    };
+
+    const updated = [newPanitera, ...sptPaniteraList];
+    setSptPaniteraList(updated);
+    localStorage.setItem('brmp_admin_panitera', JSON.stringify(updated));
+    setSelectedCandidateNip('');
+    setSptAlertMsg({ type: 'success', text: `Berhasil menetapkan ${emp.nama} sebagai Panitera SPT.` });
+  };
+
+  const handleRemovePanitera = (panitera) => {
+    if (!window.confirm(`Apakah Anda yakin ingin mencabut peran Panitera dari ${panitera.nama}?\n\nSetelah dicabut, pegawai ini tidak lagi dapat mengajukan usulan draf SPT.`)) return;
+    const updated = sptPaniteraList.filter(p => p.nip !== panitera.nip && p.id !== panitera.id);
+    setSptPaniteraList(updated);
+    localStorage.setItem('brmp_admin_panitera', JSON.stringify(updated));
+    setSptAlertMsg({ type: 'info', text: `Peran Panitera dari ${panitera.nama} telah berhasil dicabut.` });
+  };
+
+  // Penomoran SPT Actions
+  const handleOpenModalTerbit = (spt) => {
+    setModalTerbitSpt(spt);
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    const currentMonth = new Date().getMonth() + 1;
+    setInputNomorSpt(spt.nomorSpt || `B-${randomNum}/KP.320/H.14.7/${currentMonth}/2026`);
+  };
+
+  const handleConfirmTerbitSpt = (e) => {
+    if (e) e.preventDefault();
+    if (!modalTerbitSpt || !inputNomorSpt.trim()) return;
+
+    const nowStr = new Date().toLocaleDateString('id-ID') + ' ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const updated = sptRecordsList.map(s => {
+      if (s.id === modalTerbitSpt.id) {
+        return {
+          ...s,
+          nomorSpt: inputNomorSpt.trim(),
+          status: 'published',
+          diterbitkanAt: nowStr,
+          hasQr: true
+        };
+      }
+      return s;
+    });
+
+    setSptRecordsList(updated);
+    localStorage.setItem('brmp_admin_spt_records', JSON.stringify(updated));
+    setModalTerbitSpt(null);
+    setInputNomorSpt('');
+    setSptAlertMsg({ type: 'success', text: `Nomor dinas resmi SPT ${inputNomorSpt.trim()} berhasil diterbitkan dengan QR Keaslian terverifikasi!` });
+  };
+
+  // Konsiderans Actions
+  const handleAddMenimbang = () => {
+    if (!newMenimbangItem.trim()) return;
+    const updated = [...menimbangList, newMenimbangItem.trim()];
+    setMenimbangList(updated);
+    localStorage.setItem('brmp_admin_menimbang', JSON.stringify(updated));
+    setNewMenimbangItem('');
+    setSptAlertMsg({ type: 'success', text: 'Butir konsiderans Menimbang berhasil ditambahkan.' });
+  };
+
+  const handleRemoveMenimbang = (idx) => {
+    const updated = menimbangList.filter((_, i) => i !== idx);
+    setMenimbangList(updated);
+    localStorage.setItem('brmp_admin_menimbang', JSON.stringify(updated));
+  };
+
+  const handleAddDasar = () => {
+    if (!newDasarItem.trim()) return;
+    const updated = [...dasarList, newDasarItem.trim()];
+    setDasarList(updated);
+    localStorage.setItem('brmp_admin_dasar', JSON.stringify(updated));
+    setNewDasarItem('');
+    setSptAlertMsg({ type: 'success', text: 'Dasar hukum resmi berhasil ditambahkan.' });
+  };
+
+  const handleRemoveDasar = (idx) => {
+    const updated = dasarList.filter((_, i) => i !== idx);
+    setDasarList(updated);
+    localStorage.setItem('brmp_admin_dasar', JSON.stringify(updated));
+  };
+
+  const handleResetKonsideransDefault = () => {
+    if (!window.confirm('Kembalikan konsiderans Menimbang & Dasar Hukum ke format standar Kementerian Pertanian RI?')) return;
+    const defM = [
+      'Bahwa dalam rangka optimalisasi koordinasi standardisasi instrumen pertanian terpadu di Provinsi Daerah Istimewa Yogyakarta, dipandang perlu menugaskan pegawai yang tercantum dalam surat perintah ini.',
+      'Bahwa pegawai yang namanya tercantum dalam keputusan ini dipandang cakap dan memenuhi syarat untuk melaksanakan tugas kedinasan dimaksud.'
+    ];
+    const defD = [
+      'Undang-Undang Nomor 20 Tahun 2023 tentang Aparatur Sipil Negara.',
+      'Peraturan Menteri Pertanian Republik Indonesia Nomor 19 Tahun 2023 tentang Organisasi dan Tata Kerja Balai Besar Penerapan Standar Instrumen Pertanian.',
+      'Daftar Isian Pelaksanaan Anggaran (DIPA) Balai Besar Penerapan Modernisasi Pertanian DIY Tahun Anggaran 2026.'
+    ];
+    setMenimbangList(defM);
+    setDasarList(defD);
+    localStorage.setItem('brmp_admin_menimbang', JSON.stringify(defM));
+    localStorage.setItem('brmp_admin_dasar', JSON.stringify(defD));
+    setSptAlertMsg({ type: 'info', text: 'Konsiderans naskah dinas berhasil direset ke standar resmi Kementan RI.' });
   };
 
   // Export CSV Handler
@@ -1244,7 +1513,7 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
                 </button>
 
                 <button 
-                  onClick={() => onNavigate && onNavigate('spt-tracking')}
+                  onClick={() => handleTabSwitch('spt')}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -2365,47 +2634,1268 @@ export default function AdminDashboard({ user, onNavigate, onUpdateUser, initial
         </div>
       )}
 
-      {/* TAB E: DATA SPT & PENUGASAN */}
+      {/* TAB E: ADMINISTRASI SPT & PENGELOLAAN PANITERA (FLEKSIBEL) */}
       {activeTab === 'spt' && (
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div>
-              <span className="admin-card-title">Data Surat Perintah Tugas (SPT) Digital</span>
-              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                Monitoring nomor surat dinas, konsiderans menimbang/dasar hukum, dan lembar naskah dinas resmi
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
+          {/* Header & Alert Message */}
+          {sptAlertMsg.text && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              background: sptAlertMsg.type === 'error' ? '#fef2f2' : sptAlertMsg.type === 'warning' ? '#fffbeb' : sptAlertMsg.type === 'info' ? '#eff6ff' : '#f0fdf4',
+              border: `1px solid ${sptAlertMsg.type === 'error' ? '#fecaca' : sptAlertMsg.type === 'warning' ? '#fde68a' : sptAlertMsg.type === 'info' ? '#bfdbfe' : '#bbf7d0'}`,
+              color: sptAlertMsg.type === 'error' ? '#991b1b' : sptAlertMsg.type === 'warning' ? '#92400e' : sptAlertMsg.type === 'info' ? '#1e40af' : '#166534',
+              fontSize: '0.88rem',
+              fontWeight: 600
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {sptAlertMsg.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+                <span>{sptAlertMsg.text}</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSptAlertMsg({ type: '', text: '' })}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Metric Summary Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '1rem'
+          }}>
+            <div className="metric-card" style={{ cursor: 'default' }}>
+              <div className="metric-top">
+                <span className="metric-label">TOTAL ARSIP SPT</span>
+                <div className="metric-icon-box" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff' }}>
+                  <ScrollText size={18} />
+                </div>
+              </div>
+              <div className="metric-value">{sptRecordsList.length}</div>
+              <div className="metric-sub">
+                <span className="sub-left">✓ Terdata Lengkap</span>
+                <span className="sub-right">Tahun 2026</span>
               </div>
             </div>
-            <button 
-              className="btn-admin-add" 
-              onClick={() => onNavigate && onNavigate('spt-tracking')}
+
+            <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setSptSubTab('panitera')}>
+              <div className="metric-top">
+                <span className="metric-label">PANITERA AKTIF</span>
+                <div className="metric-icon-box" style={{ background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', color: '#fff' }}>
+                  <UserCheck size={18} />
+                </div>
+              </div>
+              <div className="metric-value">{sptPaniteraList.length}</div>
+              <div className="metric-sub">
+                <span className="sub-left">⚡ Fleksibel & Dinamis</span>
+                <span className="sub-right">Penyusun Usulan</span>
+              </div>
+            </div>
+
+            <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setSptSubTab('penomoran')}>
+              <div className="metric-top">
+                <span className="metric-label">SIAP PENOMORAN DINAS</span>
+                <div className="metric-icon-box" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: '#fff' }}>
+                  <FileCheck size={18} />
+                </div>
+              </div>
+              <div className="metric-value">{sptRecordsList.filter(s => s.status === 'ready_to_issue' || !s.nomorSpt).length}</div>
+              <div className="metric-sub">
+                <span className="sub-left">⚡ Menunggu Terbit Nomor</span>
+                <span className="sub-right">Kementan RI</span>
+              </div>
+            </div>
+
+            <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setSptSubTab('monitoring')}>
+              <div className="metric-top">
+                <span className="metric-label">TERVALIDASI RESMI QR</span>
+                <div className="metric-icon-box" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: '#fff' }}>
+                  <QrCode size={18} />
+                </div>
+              </div>
+              <div className="metric-value">{sptRecordsList.filter(s => s.status === 'published' && s.nomorSpt).length}</div>
+              <div className="metric-sub">
+                <span className="sub-left">✓ Ber-QR Keaslian</span>
+                <span className="sub-right">Kepala Balai</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-tab Navigation */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            background: '#ffffff',
+            padding: '8px 12px',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          }}>
+            <button
+              type="button"
+              onClick={() => setSptSubTab('panitera')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: sptSubTab === 'panitera' ? '#047857' : 'transparent',
+                color: sptSubTab === 'panitera' ? '#ffffff' : '#475569',
+                fontWeight: sptSubTab === 'panitera' ? 700 : 600,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
             >
-              Lihat Arsip Lengkap SPT
+              <UserCheck size={16} />
+              <span>1. Kelola Role Panitera (Fleksibel)</span>
+              <span style={{
+                background: sptSubTab === 'panitera' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                color: sptSubTab === 'panitera' ? '#ffffff' : '#475569',
+                padding: '1px 7px',
+                borderRadius: '10px',
+                fontSize: '0.72rem',
+                fontWeight: 700
+              }}>
+                {sptPaniteraList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSptSubTab('penomoran')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: sptSubTab === 'penomoran' ? '#047857' : 'transparent',
+                color: sptSubTab === 'penomoran' ? '#ffffff' : '#475569',
+                fontWeight: sptSubTab === 'penomoran' ? 700 : 600,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Printer size={16} />
+              <span>2. Penomoran Dinas & Penerbitan</span>
+              <span style={{
+                background: sptSubTab === 'penomoran' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                color: sptSubTab === 'penomoran' ? '#ffffff' : '#475569',
+                padding: '1px 7px',
+                borderRadius: '10px',
+                fontSize: '0.72rem',
+                fontWeight: 700
+              }}>
+                {sptRecordsList.filter(s => s.status === 'ready_to_issue' || !s.nomorSpt).length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSptSubTab('konsiderans')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: sptSubTab === 'konsiderans' ? '#047857' : 'transparent',
+                color: sptSubTab === 'konsiderans' ? '#ffffff' : '#475569',
+                fontWeight: sptSubTab === 'konsiderans' ? 700 : 600,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <FileText size={16} />
+              <span>3. Konsiderans Menimbang & Dasar Hukum</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSptSubTab('monitoring')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: sptSubTab === 'monitoring' ? '#047857' : 'transparent',
+                color: sptSubTab === 'monitoring' ? '#ffffff' : '#475569',
+                fontWeight: sptSubTab === 'monitoring' ? 700 : 600,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <ScrollText size={16} />
+              <span>4. Monitoring & Arsip Seluruh SPT</span>
+              <span style={{
+                background: sptSubTab === 'monitoring' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                color: sptSubTab === 'monitoring' ? '#ffffff' : '#475569',
+                padding: '1px 7px',
+                borderRadius: '10px',
+                fontSize: '0.72rem',
+                fontWeight: 700
+              }}>
+                {sptRecordsList.length}
+              </span>
             </button>
           </div>
 
-          <div style={{ padding: '1.5rem', textAlign: 'center' }}>
-            <FileText size={48} color="#0284c7" style={{ margin: '0 auto 12px' }} />
-            <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
-              Modul Tata Persuratan Digital Standar Kementerian Pertanian
-            </h4>
-            <p style={{ fontSize: '0.85rem', color: '#64748b', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
-              Terintegrasi dengan database 115 pegawai, anti-bentrok jadwal, konsiderans naskah dinas resmi, dan tanda tangan digital Kepala Balai.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-              <button 
-                className="btn-admin-export" 
-                onClick={() => onNavigate && onNavigate('spt-pengajuan')}
-              >
-                Buat SPT Baru
-              </button>
-              <button 
-                className="btn-admin-add" 
-                onClick={() => onNavigate && onNavigate('spt-admin-sekretariat')}
-              >
-                Pusat Administrasi Sekretariat
-              </button>
+          {/* SUB-TAB 1: KELOLA ROLE PANITERA */}
+          {sptSubTab === 'panitera' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Form Tambah Panitera */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <span className="admin-card-title">Penetapan Panitera SPT Baru</span>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      Pilih pegawai aktif dari master data (117 ASN/PPPK) untuk diberikan wewenang menyusun usulan SPT
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '1.25rem' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    background: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    borderRadius: '8px',
+                    marginBottom: '1.25rem',
+                    color: '#065f46',
+                    fontSize: '0.84rem'
+                  }}>
+                    <UserCheck size={20} color="#059669" style={{ flexShrink: 0 }} />
+                    <div>
+                      <strong>Sistem Panitera Fleksibel:</strong> Administrator dapat menetapkan dan mencabut wewenang Panitera kapan saja sesuai kebutuhan tim kerja. Panitera dapat menyusun draf SPT dinas untuk diverifikasi Kobag TU.
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                        Cari & Pilih Pegawai Balai:
+                      </label>
+                      <select
+                        value={selectedCandidateNip}
+                        onChange={(e) => setSelectedCandidateNip(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontSize: '0.88rem',
+                          background: '#ffffff',
+                          color: '#0f172a'
+                        }}
+                      >
+                        <option value="">-- Pilih Pegawai (Total: {usersList.length}) --</option>
+                        {Array.isArray(usersList) && usersList
+                          .filter(u => !sptPaniteraList.some(p => String(p.nip) === String(u.nip) || String(p.id) === String(u.id)))
+                          .map(u => (
+                            <option key={u.id || u.nip} value={u.nip}>
+                              {u.nama} — NIP: {u.nip} ({u.jabatan || u.divisi || 'Pegawai'})
+                            </option>
+                          ))
+                        }
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={handleAddPanitera}
+                        disabled={!selectedCandidateNip}
+                        className="btn-admin-add"
+                        style={{
+                          padding: '10px 20px',
+                          background: selectedCandidateNip ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)' : '#cbd5e1',
+                          cursor: selectedCandidateNip ? 'pointer' : 'not-allowed',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <Plus size={16} />
+                        <span>Tetapkan Sebagai Panitera SPT</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabel Panitera Aktif */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <span className="admin-card-title">Daftar Panitera Aktif Balai</span>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      Pegawai yang berwenang menyusun dan mengusulkan surat perintah tugas
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+                    <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px' }} />
+                    <input
+                      type="text"
+                      placeholder="Cari Panitera..."
+                      value={searchPaniteraQuery}
+                      onChange={(e) => setSearchPaniteraQuery(e.target.value)}
+                      style={{
+                        padding: '7px 10px 7px 32px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        fontSize: '0.82rem',
+                        width: '180px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="table-responsive">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '50px', textAlign: 'center' }}>NO</th>
+                        <th>NAMA PANITERA & NIP</th>
+                        <th>JABATAN / UNIT KERJA</th>
+                        <th>PERAN SISTEM</th>
+                        <th>TANGGAL PENETAPAN</th>
+                        <th>DITETAPKAN OLEH</th>
+                        <th style={{ textAlign: 'center', width: '130px' }}>AKSI</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.isArray(sptPaniteraList) && sptPaniteraList
+                        .filter(p => {
+                          if (!searchPaniteraQuery.trim()) return true;
+                          const q = searchPaniteraQuery.toLowerCase();
+                          return (p.nama && p.nama.toLowerCase().includes(q)) || (p.nip && p.nip.includes(q));
+                        })
+                        .map((p, idx) => (
+                          <tr key={p.id || p.nip || idx}>
+                            <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
+                            <td>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.nama}</div>
+                              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>NIP: {p.nip}</div>
+                            </td>
+                            <td style={{ fontSize: '0.85rem' }}>{p.jabatan || 'Pegawai Balai'}</td>
+                            <td>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                background: '#dcfce7',
+                                color: '#15803d',
+                                fontSize: '0.75rem',
+                                fontWeight: 700
+                              }}>
+                                <UserCheck size={12} />
+                                Panitera SPT
+                              </span>
+                            </td>
+                            <td style={{ fontSize: '0.82rem', color: '#475569' }}>{p.assignedAt || '2026-01-01'}</td>
+                            <td style={{ fontSize: '0.82rem', color: '#475569' }}>{p.assignedBy || 'Administrator'}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePanitera(p)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '5px 10px',
+                                  background: '#fee2e2',
+                                  border: '1px solid #fca5a5',
+                                  borderRadius: '6px',
+                                  color: '#b91c1c',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Trash2 size={13} />
+                                <span>Cabut Peran</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      }
+                      {sptPaniteraList.length === 0 && (
+                        <tr>
+                          <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                            Belum ada pegawai yang ditetapkan sebagai Panitera SPT.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* SUB-TAB 2: PENOMORAN DINAS RESMI */}
+          {sptSubTab === 'penomoran' && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <span className="admin-card-title">Pusat Penomoran Dinas Resmi (Format Standar Kementan RI)</span>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Daftar usulan SPT yang telah disetujui Kobag TU dan siap diterbitkan nomor naskah dinas resmi
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: '1rem 1.25rem 0' }}>
+                <div style={{
+                  padding: '10px 14px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '8px',
+                  color: '#1e40af',
+                  fontSize: '0.84rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <Printer size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong>Format Tata Naskah Kementan RI:</strong> <code>B-[Nomor]/KP.320/H.14.7/[Bulan]/2026</code>. Setelah diterbitkan, lembar naskah SPT dilengkapi QR Code keaslian digital dan dapat langsung dicetak.
+                  </div>
+                </div>
+              </div>
+
+              <div className="table-responsive" style={{ padding: '1.25rem' }}>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '50px', textAlign: 'center' }}>NO</th>
+                      <th>ID USULAN</th>
+                      <th>PEMOHON (PANITERA)</th>
+                      <th>MAKSUD & KEGIATAN TUGAS</th>
+                      <th>LOKASI TUJUAN</th>
+                      <th>JADWAL TUGAS</th>
+                      <th>STATUS PENOMORAN</th>
+                      <th style={{ textAlign: 'center', width: '170px' }}>AKSI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(sptRecordsList) && sptRecordsList.map((spt, idx) => (
+                      <tr key={spt.id}>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
+                        <td style={{ fontWeight: 700, color: '#0f172a' }}>{spt.id}</td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{spt.pemohon}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Panitera Tim Kerja</div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#1e293b', maxWidth: '280px' }}>{spt.kegiatan}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Personel: {spt.peserta?.length || 1} Orang</div>
+                        </td>
+                        <td style={{ fontSize: '0.85rem' }}>{spt.tujuan}</td>
+                        <td style={{ fontSize: '0.82rem' }}>
+                          <div>{spt.tglMulai} s.d {spt.tglSelesai}</div>
+                          <div style={{ color: '#059669', fontWeight: 700 }}>({spt.durasi})</div>
+                        </td>
+                        <td>
+                          {spt.nomorSpt ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                background: '#dcfce7',
+                                color: '#15803d',
+                                fontSize: '0.75rem',
+                                fontWeight: 700
+                              }}>
+                                <CheckCircle2 size={12} />
+                                Terbit: {spt.nomorSpt}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{spt.diterbitkanAt}</span>
+                            </div>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              background: '#fef3c7',
+                              color: '#b45309',
+                              fontSize: '0.75rem',
+                              fontWeight: 700
+                            }}>
+                              <Clock size={12} />
+                              Siap Diberi Nomor
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {spt.nomorSpt ? (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSptDetail(spt)}
+                              className="btn-admin-add"
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <Eye size={14} />
+                              <span>Lihat Naskah</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenModalTerbit(spt)}
+                              className="btn-admin-add"
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <FileCheck size={14} />
+                              <span>Terbitkan Nomor</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 3: KONSIDERANS MENIMBANG & DASAR HUKUM */}
+          {sptSubTab === 'konsiderans' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Konsiderans Menimbang */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <span className="admin-card-title">1. Konsiderans Menimbang (Permentan RI)</span>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      Alasan dan pertimbangan kedinasan penerbitan surat perintah tugas
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
+                    {Array.isArray(menimbangList) && menimbangList.map((item, idx) => (
+                      <div 
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          padding: '12px 14px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <span style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#e0f2fe',
+                            color: '#0369a1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            flexShrink: 0
+                          }}>
+                            {String.fromCharCode(97 + idx)}.
+                          </span>
+                          <span style={{ fontSize: '0.86rem', color: '#1e293b', lineHeight: 1.5 }}>{item}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMenimbang(idx)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#ef4444',
+                            padding: '4px'
+                          }}
+                          title="Hapus butir ini"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tambah Menimbang */}
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="Ketik butir pertimbangan baru..."
+                      value={newMenimbangItem}
+                      onChange={(e) => setNewMenimbangItem(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddMenimbang(); }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '0.86rem'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddMenimbang}
+                      className="btn-admin-add"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Plus size={16} />
+                      <span>Tambah Butir</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Konsiderans Dasar Hukum */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <span className="admin-card-title">2. Konsiderans Dasar Hukum (Undang-Undang, Permentan, DIPA)</span>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      Landasan yuridis dan peraturan perundang-undangan pelaksanaan tugas
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
+                    {Array.isArray(dasarList) && dasarList.map((item, idx) => (
+                      <div 
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          padding: '12px 14px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <span style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#dcfce7',
+                            color: '#15803d',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            flexShrink: 0
+                          }}>
+                            {idx + 1}.
+                          </span>
+                          <span style={{ fontSize: '0.86rem', color: '#1e293b', lineHeight: 1.5 }}>{item}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDasar(idx)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#ef4444',
+                            padding: '4px'
+                          }}
+                          title="Hapus butir ini"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tambah Dasar */}
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="Ketik landasan hukum/peraturan baru..."
+                      value={newDasarItem}
+                      onChange={(e) => setNewDasarItem(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddDasar(); }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '0.86rem'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddDasar}
+                      className="btn-admin-add"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Plus size={16} />
+                      <span>Tambah Dasar</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reset to standard button */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={handleResetKonsideransDefault}
+                  className="btn-admin-export"
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <RotateCcw size={15} />
+                  <span>Kembalikan Teks ke Standar Resmi Kementan RI</span>
+                </button>
+              </div>
+
+            </div>
+          )}
+
+          {/* SUB-TAB 4: MONITORING & ARSIP LENGKAP SPT */}
+          {sptSubTab === 'monitoring' && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <span className="admin-card-title">Monitoring & Arsip Seluruh SPT Dinas Balai</span>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Database penugasan kedinasan, riwayat naskah dinas resmi, dan validasi QR digital
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <select
+                    value={filterSptStatus}
+                    onChange={(e) => setFilterSptStatus(e.target.value)}
+                    style={{
+                      padding: '7px 12px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      fontSize: '0.82rem',
+                      background: '#fff'
+                    }}
+                  >
+                    <option value="ALL">Semua Status</option>
+                    <option value="published">Resmi Terbit</option>
+                    <option value="ready_to_issue">Menunggu Nomor</option>
+                  </select>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+                    <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px' }} />
+                    <input
+                      type="text"
+                      placeholder="Cari SPT / Personel..."
+                      value={searchSptQuery}
+                      onChange={(e) => setSearchSptQuery(e.target.value)}
+                      style={{
+                        padding: '7px 10px 7px 32px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        fontSize: '0.82rem',
+                        width: '200px'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="table-responsive">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '50px', textAlign: 'center' }}>NO</th>
+                      <th>NOMOR SURAT / ID</th>
+                      <th>KEGIATAN & MAKSUD PENUGASAN</th>
+                      <th>LOKASI TUJUAN</th>
+                      <th>WAKTU & DURASI</th>
+                      <th>PERSONEL DITUGASKAN</th>
+                      <th>STATUS NASKAH</th>
+                      <th style={{ textAlign: 'center', width: '130px' }}>AKSI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(sptRecordsList) && sptRecordsList
+                      .filter(s => {
+                        if (filterSptStatus === 'published' && (!s.nomorSpt || s.status !== 'published')) return false;
+                        if (filterSptStatus === 'ready_to_issue' && s.nomorSpt) return false;
+                        if (!searchSptQuery.trim()) return true;
+                        const q = searchSptQuery.toLowerCase();
+                        return (s.nomorSpt && s.nomorSpt.toLowerCase().includes(q)) ||
+                               (s.kegiatan && s.kegiatan.toLowerCase().includes(q)) ||
+                               (s.tujuan && s.tujuan.toLowerCase().includes(q)) ||
+                               (s.pemohon && s.pemohon.toLowerCase().includes(q));
+                      })
+                      .map((spt, idx) => (
+                        <tr key={spt.id}>
+                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
+                          <td>
+                            {spt.nomorSpt ? (
+                              <div style={{ fontWeight: 700, color: '#047857' }}>{spt.nomorSpt}</div>
+                            ) : (
+                              <div style={{ fontWeight: 700, color: '#d97706' }}>{spt.id}</div>
+                            )}
+                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Pemohon: {spt.pemohon}</div>
+                          </td>
+                          <td style={{ maxWidth: '300px' }}>
+                            <div style={{ fontWeight: 600, color: '#1e293b' }}>{spt.kegiatan}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Disetujui: {spt.disetujuiOleh}</div>
+                          </td>
+                          <td style={{ fontSize: '0.85rem' }}>{spt.tujuan}</td>
+                          <td style={{ fontSize: '0.82rem' }}>
+                            <div>{spt.tglMulai} s.d {spt.tglSelesai}</div>
+                            <div style={{ fontWeight: 700, color: '#059669' }}>({spt.durasi})</div>
+                          </td>
+                          <td style={{ fontSize: '0.82rem' }}>
+                            {Array.isArray(spt.peserta) ? spt.peserta.join(', ') : '-'}
+                          </td>
+                          <td>
+                            {spt.nomorSpt ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                background: '#dcfce7',
+                                color: '#15803d',
+                                fontSize: '0.75rem',
+                                fontWeight: 700
+                              }}>
+                                <CheckCircle2 size={12} />
+                                Resmi Terbit
+                              </span>
+                            ) : (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                background: '#fef3c7',
+                                color: '#b45309',
+                                fontSize: '0.75rem',
+                                fontWeight: 700
+                              }}>
+                                <Clock size={12} />
+                                Menunggu Nomor
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSptDetail(spt)}
+                              className="btn-admin-add"
+                              style={{
+                                padding: '5px 10px',
+                                fontSize: '0.78rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Eye size={13} />
+                              <span>Lihat Naskah</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL 1: TERBITKAN NOMOR DINAS RESMI SPT */}
+          {modalTerbitSpt && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '1rem',
+              backdropFilter: 'blur(4px)'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '520px',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1.25rem 1.5rem',
+                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <FileCheck size={22} />
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Terbitkan Nomor Dinas Resmi SPT</h3>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setModalTerbitSpt(null)}
+                    style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleConfirmTerbitSpt} style={{ padding: '1.5rem' }}>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '2px' }}>ID Usulan SPT:</div>
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>{modalTerbitSpt.id}</div>
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '2px' }}>Maksud Penugasan:</div>
+                    <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.88rem' }}>{modalTerbitSpt.kegiatan}</div>
+                  </div>
+
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Nomor Dinas Resmi (Format Kementan RI):
+                    </label>
+                    <input
+                      type="text"
+                      value={inputNomorSpt}
+                      onChange={(e) => setInputNomorSpt(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: '2px solid #f97316',
+                        borderRadius: '8px',
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        color: '#0f172a'
+                      }}
+                    />
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
+                      Contoh: <code>B-128/KP.320/H.14.7/10/2026</code>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: '10px 14px',
+                    background: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    borderRadius: '8px',
+                    color: '#065f46',
+                    fontSize: '0.82rem',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <QrCode size={18} color="#059669" />
+                    <span>Naskah resmi akan otomatis dilengkapi tanda tangan digital Kepala Balai dan QR Code Keaslian.</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setModalTerbitSpt(null)}
+                      className="btn-admin-export"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-admin-add"
+                      style={{
+                        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <CheckCircle2 size={16} />
+                      <span>Konfirmasi & Terbitkan SPT</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL 2: DETAIL LEMBAR NASKAH DINAS SPT RESMI */}
+          {selectedSptDetail && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '1rem',
+              backdropFilter: 'blur(4px)'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '750px',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                overflow: 'hidden'
+              }}>
+                {/* Header Modal */}
+                <div style={{
+                  padding: '1rem 1.5rem',
+                  background: '#047857',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <FileText size={20} />
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Lembar Naskah Dinas Surat Perintah Tugas (SPT)</h3>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedSptDetail(null)}
+                    style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Body Lembar Naskah Resmi Kementan */}
+                <div style={{ padding: '2rem', overflowY: 'auto', flex: 1, color: '#0f172a', background: '#fff' }}>
+                  
+                  {/* Kop Surat Kementan */}
+                  <div style={{ textAlign: 'center', borderBottom: '3px double #000', paddingBottom: '12px', marginBottom: '1.25rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.05em' }}>KEMENTERIAN PERTANIAN</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>BADAN STANDARDISASI INSTRUMEN PERTANIAN</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#064e3b', letterSpacing: '0.04em' }}>
+                      BALAI BESAR PENERAPAN MODERNISASI PERTANIAN DAERAH ISTIMEWA YOGYAKARTA
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#475569' }}>
+                      Jalan Sagan No. 12, Gondokusuman, Yogyakarta 55223 | Laman: kita.brmpdiy.my.id
+                    </div>
+                  </div>
+
+                  {/* Judul & Nomor SPT */}
+                  <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 900, textDecoration: 'underline', letterSpacing: '0.05em' }}>
+                      SURAT PERINTAH TUGAS
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '4px' }}>
+                      NOMOR: {selectedSptDetail.nomorSpt || `[DRAF - BELUM DITERBITKAN NOMOR DINAS]`}
+                    </div>
+                  </div>
+
+                  {/* Menimbang & Dasar */}
+                  <div style={{ marginBottom: '1.25rem', fontSize: '0.84rem', lineHeight: 1.6 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 800 }}>Menimbang</div>
+                      <div>
+                        {menimbangList.map((m, i) => (
+                          <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+                            <span>{String.fromCharCode(97 + i)}.</span>
+                            <span>{m}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px' }}>
+                      <div style={{ fontWeight: 800 }}>Dasar</div>
+                      <div>
+                        {dasarList.map((d, i) => (
+                          <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+                            <span>{i + 1}.</span>
+                            <span>{d}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Memerintahkan */}
+                  <div style={{ textAlign: 'center', fontWeight: 800, margin: '1rem 0 0.75rem', fontSize: '0.9rem' }}>
+                    MEMERINTAHKAN:
+                  </div>
+
+                  {/* Daftar Personil Ditugaskan */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', marginBottom: '6px' }}>Kepada:</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', border: '1px solid #cbd5e1' }}>
+                      <thead>
+                        <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                          <th style={{ padding: '6px 10px', textAlign: 'center', width: '40px' }}>No</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left' }}>Nama & NIP Pegawai</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left' }}>Jabatan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.isArray(selectedSptDetail.peserta) && selectedSptDetail.peserta.map((namaPeserta, idx) => {
+                          const pUser = usersList.find(u => u.nama === namaPeserta);
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                              <td style={{ padding: '6px 10px', textAlign: 'center' }}>{idx + 1}</td>
+                              <td style={{ padding: '6px 10px' }}>
+                                <div style={{ fontWeight: 700 }}>{namaPeserta}</div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>NIP: {pUser?.nip || '-'}</div>
+                              </td>
+                              <td style={{ padding: '6px 10px' }}>{pUser?.jabatan || 'Pegawai Balai'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Untuk */}
+                  <div style={{ fontSize: '0.84rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px' }}>
+                      <div style={{ fontWeight: 800 }}>Untuk</div>
+                      <div>
+                        <div>1. Melaksanakan tugas kedinasan: <strong>{selectedSptDetail.kegiatan}</strong>.</div>
+                        <div>2. Lokasi Tujuan: <strong>{selectedSptDetail.tujuan}</strong>.</div>
+                        <div>3. Waktu Pelaksanaan: <strong>{selectedSptDetail.tglMulai} s.d {selectedSptDetail.tglSelesai} ({selectedSptDetail.durasi})</strong>.</div>
+                        <div>4. Melaporkan hasil pelaksanaan tugas kedinasan kepada Kepala Balai Besar Penerapan Modernisasi Pertanian DIY setelah tugas selesai.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tanda Tangan Digital Kepala Balai */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                    <div style={{ textAlign: 'center', width: '280px' }}>
+                      <div style={{ fontSize: '0.82rem' }}>Ditetapkan di Yogyakarta</div>
+                      <div style={{ fontSize: '0.82rem', marginBottom: '8px' }}>Pada tanggal {selectedSptDetail.tglMulai}</div>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 800 }}>Kepala Balai Besar,</div>
+                      
+                      {/* Box QR Code Digital Signature */}
+                      <div style={{
+                        margin: '12px auto',
+                        padding: '10px',
+                        border: '1px dashed #047857',
+                        borderRadius: '8px',
+                        background: '#f0fdf4',
+                        display: 'inline-flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <QrCode size={44} color="#047857" />
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#065f46' }}>
+                          TERVERIFIKASI DIGITAL KITA
+                        </span>
+                        <span style={{ fontSize: '0.64rem', color: '#64748b' }}>
+                          BSIP / Kementan RI
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, textDecoration: 'underline' }}>
+                        Dr. Soeharsono, S.Pt, M.Si
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#475569' }}>
+                        NIP: 197109271998031002
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer Modal Actions */}
+                <div style={{
+                  padding: '1rem 1.5rem',
+                  borderTop: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSptDetail(null)}
+                    className="btn-admin-export"
+                  >
+                    Tutup Lembar SPT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="btn-admin-add"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Printer size={16} />
+                    <span>Cetak / Unduh PDF</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
