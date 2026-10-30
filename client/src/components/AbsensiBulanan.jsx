@@ -3,8 +3,9 @@ import { apiService } from '../services/api';
 import { CalendarCheck2, Filter, Search, CheckCircle2, Clock, AlertTriangle, XCircle, HeartPulse, UserCheck, ShieldCheck } from 'lucide-react';
 
 export default function AbsensiBulanan({ user }) {
-  const [selectedBulan, setSelectedBulan] = useState(6); // Juni
-  const [selectedTahun, setSelectedTahun] = useState(2025);
+  const currentDate = new Date();
+  const [selectedBulan, setSelectedBulan] = useState(currentDate.getMonth() + 1);
+  const [selectedTahun, setSelectedTahun] = useState(currentDate.getFullYear());
   const [loading, setLoading] = useState(false);
   const [absensiData, setAbsensiData] = useState(null);
   const [allUsers, setAllUsers] = useState([]);

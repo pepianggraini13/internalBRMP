@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Sparkles
 } from 'lucide-react';
+import CutiFormulirBkn from './CutiFormulirBkn';
 
 export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
   // Active Tab: 'form' | 'my-history' | 'verification' | 'user-roles'
@@ -44,6 +45,13 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
   const [tanggalAkhir, setTanggalAkhir] = useState('');
   const [alasan, setAlasan] = useState('');
   const [jumlahHari, setJumlahHari] = useState(0);
+  const [alamatCuti, setAlamatCuti] = useState('');
+  const [noTelpCuti, setNoTelpCuti] = useState('');
+
+  // Printable and workflow modal states
+  const [selectedPrintCuti, setSelectedPrintCuti] = useState(null);
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
+  const [lastSubmittedCuti, setLastSubmittedCuti] = useState(null);
 
   // Data states
   const [myHistory, setMyHistory] = useState([]);
@@ -70,10 +78,12 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
   const [verifyNote, setVerifyNote] = useState('');
   const [showVerifyModal, setShowVerifyModal] = useState(false);
 
-  // Sync prop changes
+  // Sync prop changes & default contact values
   useEffect(() => {
     if (initialUser) {
       setCurrentUser(initialUser);
+      if (initialUser.alamat && !alamatCuti) setAlamatCuti(initialUser.alamat);
+      if (initialUser.noHp && !noTelpCuti) setNoTelpCuti(initialUser.noHp);
     }
   }, [initialUser]);
 
@@ -141,8 +151,10 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
       return;
     }
 
-    if (jenisCuti === 'Tahunan' && currentUser?.sisaCuti < jumlahHari) {
-      setErrorMsg(`Sisa cuti Anda (${currentUser?.sisaCuti} hari) tidak mencukupi untuk ${jumlahHari} hari pengajuan.`);
+    const totalSisa = (Number(currentUser?.sisaCutiN) || 0) + (Number(currentUser?.sisaCutiN1) || 0) || currentUser?.sisaCuti || 12;
+
+    if (jenisCuti === 'Tahunan' && totalSisa < jumlahHari) {
+      setErrorMsg(`Total sisa cuti Anda (${totalSisa} hari) tidak mencukupi untuk ${jumlahHari} hari pengajuan.`);
       return;
     }
 
@@ -154,22 +166,26 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
         nama: currentUser?.nama,
         jabatan: currentUser?.jabatan,
         divisi: currentUser?.divisi,
+        masaKerja: currentUser?.masaKerja || "01 Tahun 03 Bulan",
         jenisCuti,
         tanggalMulai,
         tanggalAkhir,
-        alasan
+        alasan,
+        alamatCuti: alamatCuti || currentUser?.alamat || "Yogyakarta",
+        noTelpCuti: noTelpCuti || currentUser?.noHp || "085268238966"
       };
 
       const res = await apiService.submitCuti(payload);
       if (res.success) {
-        setSuccessMsg('Pengajuan cuti berhasil diajukan! Berkas otomatis masuk ke antrean Verifikasi 1 (Atasan Langsung).');
+        setSuccessMsg('Pengajuan cuti berhasil dibuat dan berstatus DALAM PROSES!');
+        setLastSubmittedCuti(res.data);
+        setShowWorkflowModal(true);
         // Reset form
         setAlasan('');
         setTanggalMulai('');
         setTanggalAkhir('');
         setJumlahHari(0);
         await loadCutiData();
-        setActiveTab('my-history');
       }
     } catch (err) {
       setErrorMsg(err.message || 'Gagal menyimpan pengajuan cuti.');
@@ -187,7 +203,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
     setShowVerifyModal(true);
   };
 
-  // Submit Verification (Approve / Reject)
+  // Submit Verification (Approve / Reject) - 1 Kali ACC Langsung Selesai & Potong Kuota
   const handleConfirmVerification = async () => {
     if (!selectedCuti) return;
     setActionLoading(true);
@@ -195,22 +211,61 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
     setErrorMsg('');
 
     try {
-      const res = await apiService.verifyCuti(
-        selectedCuti.id,
-        verifyStage,
-        verifyAction,
-        currentUser,
-        verifyNote
-      );
+      let res;
+      if (verifyAction === 'approve') {
+        res = await apiService.selesaikanCuti(
+          selectedCuti.id,
+          currentUser,
+          verifyNote || 'Disetujui oleh Petugas Kepegawaian. Kuota resmi terpotong sistem.'
+        );
+      } else {
+        res = await apiService.verifyCuti(
+          selectedCuti.id,
+          2,
+          'reject',
+          currentUser,
+          verifyNote || 'Permohonan cuti belum dapat disetujui.'
+        );
+      }
 
       if (res.success) {
-        setSuccessMsg(res.message || 'Verifikasi berhasil disimpan.');
+        setSuccessMsg(res.message || (verifyAction === 'approve' ? 'Permohonan cuti berhasil di-ACC dan kuota dipotong!' : 'Permohonan cuti ditolak.'));
         setShowVerifyModal(false);
         setSelectedCuti(null);
         await loadCutiData();
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Gagal melakukan verifikasi.');
+      setErrorMsg(err.message || 'Gagal memproses persetujuan cuti.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Selesaikan alur & ACC langsung oleh Petugas Kepegawaian (Memotong kuota FIFO)
+  const handleSelesaikanAlur = async (cutiItem) => {
+    const isTahunan = cutiItem.jenisCuti === 'Tahunan';
+    const confirmText = isTahunan
+      ? `Selesaikan alur & ACC Cuti Tahunan (${cutiItem.jumlahHari} hari) atas nama ${cutiItem.nama}?\n\nSistem akan otomatis memotong kuota cuti pegawai secara berjenjang (menghabiskan sisa tahun lalu N-1 terlebih dahulu, lalu jatah tahun berjalan N).`
+      : `Selesaikan alur & ACC ${cutiItem.jenisCuti} (${cutiItem.jumlahHari} hari) atas nama ${cutiItem.nama}?`;
+
+    if (!window.confirm(confirmText)) return;
+
+    try {
+      setActionLoading(true);
+      setSuccessMsg('');
+      setErrorMsg('');
+      const res = await apiService.selesaikanCuti(
+        cutiItem.id,
+        currentUser,
+        'Alur cuti selesai dan disahkan oleh Petugas Kepegawaian. Kuota resmi terpotong sistem.'
+      );
+
+      if (res.success) {
+        setSuccessMsg(res.message || 'Alur pengajuan cuti berhasil diselesaikan dan di-ACC!');
+        await loadCutiData();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Gagal menyelesaikan alur cuti.');
     } finally {
       setActionLoading(false);
     }
@@ -300,39 +355,41 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
   // Helper render status badge
   const renderStatusBadge = (status) => {
     switch (status) {
+      case 'dalam_proses':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700 }}>
+            <Clock size={13} />
+            <span>Dalam Proses (Ikuti Alur)</span>
+          </span>
+        );
       case 'menunggu_verif_1':
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700 }}>
             <Clock size={13} />
-            <span>Menunggu Verifikasi 1 (Atasan)</span>
+            <span>Dalam Proses (Verifikasi 1)</span>
           </span>
         );
       case 'menunggu_verif_2':
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#e0e7ff', color: '#4338ca', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700 }}>
             <Clock size={13} />
-            <span>Menunggu Verifikasi 2 (Kepala TU)</span>
+            <span>Dalam Proses (Verifikasi 2)</span>
           </span>
         );
       case 'disetujui':
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700 }}>
             <CheckCircle2 size={13} />
-            <span>Disetujui Lengkap (Final)</span>
+            <span>Disetujui / Di-ACC Petugas</span>
           </span>
         );
+      case 'ditolak':
       case 'ditolak_verif_1':
-        return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700 }}>
-            <X size={13} />
-            <span>Ditolak Verifikator 1</span>
-          </span>
-        );
       case 'ditolak_verif_2':
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700 }}>
             <X size={13} />
-            <span>Ditolak Verifikator 2 (Kepala TU)</span>
+            <span>Ditolak</span>
           </span>
         );
       default:
@@ -340,105 +397,65 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
     }
   };
 
-  // Helper render 2-step verification progress bar
+  // Helper render Persetujuan Kepegawaian (1 Kali ACC Langsung Selesai & Potong Kuota)
   const renderVerificationStepper = (item) => {
-    const v1 = item.verifikasi?.tahap1;
-    const v2 = item.verifikasi?.tahap2;
-
-    const isV1Done = v1?.status === 'disetujui';
-    const isV1Rejected = v1?.status === 'ditolak';
-    const isV2Done = v2?.status === 'disetujui';
-    const isV2Rejected = v2?.status === 'ditolak';
+    const isApproved = item.status === 'disetujui';
+    const isRejected = item.status === 'ditolak' || item.status?.startsWith('ditolak');
+    const verif = item.verifikasi?.tahap2?.status === 'disetujui' ? item.verifikasi.tahap2 : (item.verifikasi?.tahap1?.status === 'disetujui' ? item.verifikasi.tahap1 : null);
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '220px' }}>
-        {/* Step 1 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-          <div style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '50%',
-            background: isV1Done ? '#10b981' : isV1Rejected ? '#ef4444' : '#f59e0b',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '11px',
-            fontWeight: 800,
-            flexShrink: 0,
-            marginTop: '1px'
-          }}>
-            {isV1Done ? '✓' : isV1Rejected ? '✕' : '1'}
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
-              Tahap 1: Atasan Langsung
-            </div>
-            <div style={{ fontSize: '0.7rem', color: isV1Done ? '#15803d' : isV1Rejected ? '#b91c1c' : '#64748b' }}>
-              {isV1Done ? `Disetujui (${v1?.verifikatorNama || 'Atasan'})` : isV1Rejected ? 'Ditolak Atasan' : 'Menunggu persetujuan'}
-            </div>
-            {v1?.catatan && (
-              <div style={{ fontSize: '0.68rem', color: '#475569', fontStyle: 'italic', marginTop: '2px' }}>
-                "{v1.catatan}"
-              </div>
-            )}
-          </div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', minWidth: '200px' }}>
+        <div style={{
+          width: '24px',
+          height: '24px',
+          borderRadius: '50%',
+          background: isApproved ? '#10b981' : isRejected ? '#ef4444' : '#f59e0b',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px',
+          fontWeight: 800,
+          flexShrink: 0,
+          marginTop: '2px'
+        }}>
+          {isApproved ? '✓' : isRejected ? '✕' : '⏳'}
         </div>
-
-        {/* Connector Line */}
-        <div style={{ width: '2px', height: '10px', background: isV1Done ? '#10b981' : '#cbd5e1', marginLeft: '9px' }} />
-
-        {/* Step 2 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-          <div style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '50%',
-            background: isV2Done ? '#10b981' : isV2Rejected ? '#ef4444' : isV1Done ? '#f59e0b' : '#cbd5e1',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '11px',
-            fontWeight: 800,
-            flexShrink: 0,
-            marginTop: '1px'
-          }}>
-            {isV2Done ? '✓' : isV2Rejected ? '✕' : '2'}
+        <div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: isApproved ? '#166534' : isRejected ? '#b91c1c' : '#1e293b' }}>
+            {isApproved ? 'Disetujui Kepegawaian (ACC)' : isRejected ? 'Ditolak Kepegawaian' : 'Menunggu ACC Kepegawaian'}
           </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
-              Tahap 2: Kepala Bagian TU (Final)
-            </div>
-            <div style={{ fontSize: '0.7rem', color: isV2Done ? '#15803d' : isV2Rejected ? '#b91c1c' : '#64748b' }}>
-              {isV2Done ? `Disetujui Final (${v2?.verifikatorNama || 'Kobag TU'})` : isV2Rejected ? 'Ditolak Kobag TU' : isV1Done ? 'Menunggu persetujuan' : 'Antre setelah tahap 1'}
-            </div>
-            {v2?.catatan && (
-              <div style={{ fontSize: '0.68rem', color: '#475569', fontStyle: 'italic', marginTop: '2px' }}>
-                "{v2.catatan}"
-              </div>
-            )}
+          <div style={{ fontSize: '0.7rem', color: isApproved ? '#15803d' : isRejected ? '#b91c1c' : '#64748b' }}>
+            {isApproved ? (verif?.verifikatorNama ? `Oleh: ${verif.verifikatorNama}` : 'Alur Selesai & Kuota Terpotong') : isRejected ? 'Permohonan ditolak petugas' : '1 Kali ACC langsung selesai'}
           </div>
+          {(verif?.catatan || item.catatan) && (
+            <div style={{ fontSize: '0.68rem', color: '#475569', fontStyle: 'italic', marginTop: '2px' }}>
+              "{verif?.catatan || item.catatan}"
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
-  // Determine permissions
-  const isVerifikator1 = currentUser?.approvalRole === 'verifikator_1' || currentUser?.approvalRole === 'admin' || currentUser?.systemRole === 'admin';
-  const isVerifikator2 = currentUser?.approvalRole === 'verifikator_2' || currentUser?.approvalRole === 'admin' || currentUser?.systemRole === 'admin';
-  const isAdmin = currentUser?.systemRole === 'admin' || currentUser?.approvalRole === 'admin';
+  // Determine permissions - Role Kepegawaian berwenang melakukan ACC Cuti 1 kali langsung
+  const isKepegawaian = 
+    currentUser?.approvalRole === 'kepegawaian' ||
+    currentUser?.approvalRole === 'admin' ||
+    currentUser?.systemRole === 'admin' ||
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'kepegawaian' ||
+    currentUser?.nip === '198001012005011001' ||
+    String(currentUser?.divisi || '').toLowerCase().includes('kepegawaian') ||
+    String(currentUser?.divisi || '').toLowerCase().includes('sumber daya manusia') ||
+    String(currentUser?.jabatan || '').toLowerCase().includes('kepegawaian');
 
-  // Filtered inbox for verification
-  const inboxItems = allHistory.filter(item => {
-    if (currentUser?.approvalRole === 'verifikator_1') {
-      return item.status === 'menunggu_verif_1';
-    }
-    if (currentUser?.approvalRole === 'verifikator_2') {
-      return item.status === 'menunggu_verif_2';
-    }
-    return true; // Admin sees all
-  });
+  const isAdmin = currentUser?.systemRole === 'admin' || currentUser?.approvalRole === 'admin';
+  const isVerifikator1 = isKepegawaian;
+  const isVerifikator2 = isKepegawaian;
+
+  // Filtered pending cuti
+  const pendingCutiCount = allHistory.filter(c => c.status === 'dalam_proses' || c.status?.startsWith('menunggu')).length;
 
   return (
     <div style={{ paddingBottom: '3rem' }}>
@@ -455,7 +472,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
               <span>/</span>
               <span>Cuti Pegawai</span>
               <span>/</span>
-              <span style={{ color: 'var(--primary-700)', fontWeight: 700 }}>Alur 2 Kali Verifikasi</span>
+              <span style={{ color: 'var(--primary-700)', fontWeight: 700 }}>Persetujuan Kepegawaian (1 Kali ACC)</span>
             </div>
           </div>
 
@@ -474,12 +491,12 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
               width: '36px',
               height: '36px',
               borderRadius: '8px',
-              background: isAdmin ? '#fee2e2' : isVerifikator2 ? '#fef3c7' : isVerifikator1 ? '#e0e7ff' : 'var(--primary-50)',
-              color: isAdmin ? '#dc2626' : isVerifikator2 ? '#d97706' : isVerifikator1 ? '#4338ca' : 'var(--primary-700)',
+              background: isAdmin ? '#fee2e2' : isKepegawaian ? '#ecfdf5' : 'var(--primary-50)',
+              color: isAdmin ? '#dc2626' : isKepegawaian ? '#059669' : 'var(--primary-700)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: !isAdmin && !isVerifikator2 && !isVerifikator1 ? '1px solid var(--primary-200)' : 'none'
+              border: !isAdmin && !isKepegawaian ? '1px solid var(--primary-200)' : 'none'
             }}>
               <ShieldCheck size={20} />
             </div>
@@ -488,7 +505,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                 Peran Pengguna Saat Ini
               </div>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                {currentUser?.roleLabel || (isAdmin ? 'Administrator' : isVerifikator1 ? 'Verifikator 1 (Atasan)' : isVerifikator2 ? 'Verifikator 2 (Kobag TU)' : 'Pegawai (Pemohon)')}
+                {currentUser?.roleLabel || (isAdmin ? 'Administrator Kepegawaian' : isKepegawaian ? 'Petugas Kepegawaian (ACC Cuti)' : 'Pegawai (Pemohon Cuti)')}
               </div>
             </div>
           </div>
@@ -496,30 +513,32 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
       </div>
 
       {/* Metric Cards Banner */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="brmp-card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--primary-600)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Sisa Cuti Tahunan</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Total Sisa Cuti Tahunan</span>
               <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', margin: '4px 0 0 0' }}>
-                {currentUser?.sisaCuti ?? 12} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>Hari</span>
+                {(Number(currentUser?.sisaCutiN) || 0) + (Number(currentUser?.sisaCutiN1) || 0) || currentUser?.sisaCuti || 12} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>Hari</span>
               </h3>
             </div>
             <div style={{ padding: '10px', background: 'var(--primary-50)', borderRadius: '10px', color: 'var(--primary-600)', border: '1px solid var(--primary-200)' }}>
               <Calendar size={22} />
             </div>
           </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--primary-700)', marginTop: '6px', fontWeight: 700 }}>
-            • Terpakai: {currentUser?.cutiTerpakai || 0} hari
+          <div style={{ fontSize: '0.72rem', color: '#334155', marginTop: '8px', lineHeight: 1.4 }}>
+            <div>• Sisa Thn Lalu (<strong>N-1</strong>): <strong style={{ color: '#d97706' }}>{currentUser?.sisaCutiN1 || 0} hari</strong> <em>(prioritas 1)</em></div>
+            <div>• Jatah Thn Ini (<strong>N</strong>): <strong>{currentUser?.sisaCutiN !== undefined ? currentUser.sisaCutiN : (currentUser?.sisaCuti || 12)} hari</strong></div>
+            <div style={{ color: '#64748b' }}>• Cuti Terpakai: {currentUser?.cutiTerpakai || 0} hari</div>
           </div>
         </div>
 
         <div className="brmp-card" style={{ padding: '1.25rem', borderLeft: '4px solid #f59e0b' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Menunggu Verif 1 (Atasan)</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Permohonan Dalam Proses</span>
               <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706', margin: '4px 0 0 0' }}>
-                {cutiSummary.menungguVerif1} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>Berkas</span>
+                {allHistory.filter(c => c.status === 'dalam_proses' || c.status?.startsWith('menunggu')).length} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>Berkas</span>
               </h3>
             </div>
             <div style={{ padding: '10px', background: '#fef3c7', borderRadius: '10px', color: '#d97706' }}>
@@ -527,33 +546,16 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
             </div>
           </div>
           <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '6px' }}>
-            Tahap 1 Ketua Tim Kerja
-          </div>
-        </div>
-
-        <div className="brmp-card" style={{ padding: '1.25rem', borderLeft: '4px solid #6366f1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Menunggu Verif 2 (Kobag TU)</span>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4f46e5', margin: '4px 0 0 0' }}>
-                {cutiSummary.menungguVerif2} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>Berkas</span>
-              </h3>
-            </div>
-            <div style={{ padding: '10px', background: '#e0e7ff', borderRadius: '10px', color: '#4f46e5' }}>
-              <FileCheck size={22} />
-            </div>
-          </div>
-          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '6px' }}>
-            Tahap 2 Persetujuan Akhir
+            Menunggu penyelesaian alur berkas fisik / ACC
           </div>
         </div>
 
         <div className="brmp-card" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Disetujui Lengkap</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Disetujui / Selesai (ACC)</span>
               <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', margin: '4px 0 0 0' }}>
-                {cutiSummary.disetujui} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>Berkas</span>
+                {allHistory.filter(c => c.status === 'disetujui').length} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>Berkas</span>
               </h3>
             </div>
             <div style={{ padding: '10px', background: '#dcfce7', borderRadius: '10px', color: '#15803d' }}>
@@ -561,7 +563,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
             </div>
           </div>
           <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '6px' }}>
-            Selesai 2 kali verifikasi
+            Alur disahkan & kuota terpotong sistem
           </div>
         </div>
       </div>
@@ -671,8 +673,8 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
           </span>
         </button>
 
-        {/* Tab Verifikasi (Tersedia untuk Verifikator 1, Verifikator 2, atau Admin) */}
-        {(isVerifikator1 || isVerifikator2 || isAdmin) && (
+        {/* Tab Persetujuan Cuti (Khusus Petugas Kepegawaian & Admin) */}
+        {isKepegawaian && (
           <button
             onClick={() => setActiveTab('verification')}
             style={{
@@ -693,12 +695,10 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
             }}
           >
             <ShieldCheck size={17} />
-            <span>Persetujuan / Verifikasi Cuti</span>
-            {(pendingVerif1.length > 0 || pendingVerif2.length > 0) && (
+            <span>Persetujuan Cuti (Role Kepegawaian)</span>
+            {pendingCutiCount > 0 && (
               <span style={{ background: '#f59e0b', color: '#ffffff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                {isVerifikator1 && !isVerifikator2 ? pendingVerif1.length :
-                 isVerifikator2 && !isVerifikator1 ? pendingVerif2.length :
-                 pendingVerif1.length + pendingVerif2.length}
+                {pendingCutiCount}
               </span>
             )}
           </button>
@@ -745,7 +745,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                   Form Pengajuan Cuti
                 </h3>
                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  Otomatis diverifikasi 2 tahap (Atasan & Kobag TU)
+                  Persetujuan Cuti oleh Petugas Kepegawaian (1 Kali ACC Langsung Selesai)
                 </span>
               </div>
             </div>
@@ -838,6 +838,37 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                 />
               </div>
 
+              {/* Alamat & Nomor Telepon Selama Cuti (Sesuai Format Formulir BKN) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                    Alamat Selama Cuti
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Contoh: Jakarta / Yogyakarta"
+                    value={alamatCuti}
+                    onChange={(e) => setAlamatCuti(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                    No. Telp / HP Selama Cuti
+                  </label>
+                  <input
+                    type="tel"
+                    className="form-input"
+                    placeholder="Contoh: 085268238966"
+                    value={noTelpCuti}
+                    onChange={(e) => setNoTelpCuti(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
               {/* Tombol Simpan & Kirim */}
               <button
                 type="submit"
@@ -870,41 +901,36 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
             <div className="brmp-card" style={{ padding: '1.5rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldCheck size={18} style={{ color: 'var(--primary-600)' }} />
-                <span>Alur 2 Kali Verifikasi Pengajuan Cuti</span>
+                <span>Alur Persetujuan Cuti (Role Kepegawaian)</span>
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {/* Step 1 Box */}
-                <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--primary-600)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0 }}>
-                    1
+                {/* Step 1 Box - ACC Kepegawaian */}
+                <div style={{ display: 'flex', gap: '12px', background: '#ecfdf5', padding: '14px', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '14px' }}>
+                    ✓
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
-                      Verifikasi 1: Atasan Langsung / Ketua Tim Kerja
+                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#065f46' }}>
+                      Persetujuan Tunggal (1 Kali ACC Langsung Selesai)
                     </h4>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
-                      Ketua Tim Kerja (Ketimker) memeriksa ketersediaan pengganti tugas, relevansi alasan, dan jadwal kegiatan tim sebelum memberikan persetujuan awal.
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#047857', lineHeight: 1.45 }}>
+                      Pengajuan cuti ditelaah dan disetujui dalam <strong>1 kali ACC</strong> oleh <strong>Petugas Kepegawaian</strong>. Tidak ada alur ganda atau bertingkat.
                     </p>
                   </div>
                 </div>
 
-                {/* Arrow */}
-                <div style={{ textAlign: 'center', color: '#94a3b8' }}>
-                  <ArrowRight size={18} style={{ transform: 'rotate(90deg)' }} />
-                </div>
-
-                {/* Step 2 Box */}
+                {/* Step 2 Box - Potong Kuota FIFO */}
                 <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#4f46e5', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0 }}>
-                    2
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#0284c7', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '12px' }}>
+                    ⚡
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
-                      Verifikasi 2: Kepala Bagian Tata Usaha (Persetujuan Final)
+                    <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: '#0369a1' }}>
+                      Kuota Cuti Otomatis Terpotong (FIFO)
                     </h4>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
-                      Kobag TU memberikan pengesahan cuti definitif. Sisa cuti tahunan pegawai otomatis terpotong dan lembar persetujuan cuti resmi dapat dicetak.
+                      Setelah di-ACC oleh Kepegawaian, sistem otomatis memotong kuota cuti tahun lalu (N-1) terlebih dahulu, lalu jatah tahun berjalan (N). Lembar BKN resmi langsung siap dicetak.
                     </p>
                   </div>
                 </div>
@@ -934,7 +960,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                 Riwayat Pengajuan Cuti Saya
               </h3>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                Pantau progres status verifikasi 2 tahap secara transparan
+                Pantau riwayat dan status persetujuan cuti Anda secara transparan
               </span>
             </div>
 
@@ -1009,8 +1035,30 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                       <td>
                         {renderStatusBadge(item.status)}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {item.status === 'menunggu_verif_1' && (
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button
+                          onClick={() => setSelectedPrintCuti(item)}
+                          style={{
+                            background: '#f0fdf4',
+                            border: '1px solid #86efac',
+                            color: '#15803d',
+                            padding: '5px 9px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            marginRight: '6px'
+                          }}
+                          title="Cetak Formulir Permintaan dan Pemberian Cuti (Format Resmi BKN)"
+                        >
+                          <Printer size={13} />
+                          <span>Formulir BKN</span>
+                        </button>
+
+                        {(item.status === 'dalam_proses' || item.status === 'menunggu_verif_1') && (
                           <button
                             onClick={() => handleCancelCuti(item.id)}
                             style={{
@@ -1026,29 +1074,6 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                             title="Batalkan permohonan cuti"
                           >
                             Batalkan
-                          </button>
-                        )}
-
-                        {item.status === 'disetujui' && (
-                          <button
-                            onClick={() => window.print()}
-                            style={{
-                              background: '#f0fdf4',
-                              border: '1px solid #86efac',
-                              color: '#15803d',
-                              padding: '5px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title="Cetak lembar persetujuan cuti"
-                          >
-                            <Printer size={13} />
-                            <span>Cetak</span>
                           </button>
                         )}
                       </td>
@@ -1068,15 +1093,15 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
             <div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldCheck size={20} style={{ color: 'var(--primary-600)' }} />
-                <span>Inbox Persetujuan Cuti Pegawai</span>
+                <span>Inbox Persetujuan Cuti Pegawai (Role Kepegawaian)</span>
               </h3>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                Hak wewenang Anda: <strong>{currentUser?.roleLabel}</strong>
+                Wewenang: <strong>Petugas Kepegawaian</strong> • 1 Kali ACC Langsung Selesai & Potong Kuota Cuti
               </span>
             </div>
 
-            {/* Stage filter pills */}
-            <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+            {/* Status filter pills */}
+            <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '8px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setStatusFilter('all')}
                 style={{
@@ -1091,10 +1116,10 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                   boxShadow: statusFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
                 }}
               >
-                Semua Antrean ({allHistory.length})
+                Semua ({allHistory.length})
               </button>
               <button
-                onClick={() => setStatusFilter('tahap1')}
+                onClick={() => setStatusFilter('pending')}
                 style={{
                   padding: '5px 10px',
                   borderRadius: '6px',
@@ -1102,15 +1127,15 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: statusFilter === 'tahap1' ? '#fff' : 'transparent',
-                  color: statusFilter === 'tahap1' ? '#d97706' : '#64748b',
-                  boxShadow: statusFilter === 'tahap1' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  background: statusFilter === 'pending' ? '#fff' : 'transparent',
+                  color: statusFilter === 'pending' ? '#d97706' : '#64748b',
+                  boxShadow: statusFilter === 'pending' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
                 }}
               >
-                Tahap 1 Menunggu ({pendingVerif1.length})
+                Menunggu ACC ({pendingCutiCount})
               </button>
               <button
-                onClick={() => setStatusFilter('tahap2')}
+                onClick={() => setStatusFilter('disetujui')}
                 style={{
                   padding: '5px 10px',
                   borderRadius: '6px',
@@ -1118,12 +1143,28 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: statusFilter === 'tahap2' ? '#fff' : 'transparent',
-                  color: statusFilter === 'tahap2' ? '#4f46e5' : '#64748b',
-                  boxShadow: statusFilter === 'tahap2' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  background: statusFilter === 'disetujui' ? '#fff' : 'transparent',
+                  color: statusFilter === 'disetujui' ? '#15803d' : '#64748b',
+                  boxShadow: statusFilter === 'disetujui' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
                 }}
               >
-                Tahap 2 Menunggu ({pendingVerif2.length})
+                Disetujui ({allHistory.filter(c => c.status === 'disetujui').length})
+              </button>
+              <button
+                onClick={() => setStatusFilter('ditolak')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: statusFilter === 'ditolak' ? '#fff' : 'transparent',
+                  color: statusFilter === 'ditolak' ? '#dc2626' : '#64748b',
+                  boxShadow: statusFilter === 'ditolak' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                }}
+              >
+                Ditolak ({allHistory.filter(c => c.status?.startsWith('ditolak')).length})
               </button>
             </div>
           </div>
@@ -1139,14 +1180,16 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                   <th>DURASI</th>
                   <th>JENIS & ALASAN</th>
                   <th>STATUS SAAT INI</th>
-                  <th style={{ minWidth: '180px' }}>AKSI VERIFIKASI</th>
+                  <th style={{ minWidth: '180px' }}>AKSI PERSETUJUAN</th>
                 </tr>
               </thead>
               <tbody>
                 {allHistory
                   .filter(item => {
-                    if (statusFilter === 'tahap1') return item.status === 'menunggu_verif_1';
-                    if (statusFilter === 'tahap2') return item.status === 'menunggu_verif_2';
+                    if (statusFilter === 'pending') return item.status === 'dalam_proses' || item.status?.startsWith('menunggu');
+                    if (statusFilter === 'tahap1' || statusFilter === 'tahap2') return item.status === 'dalam_proses' || item.status?.startsWith('menunggu');
+                    if (statusFilter === 'disetujui') return item.status === 'disetujui';
+                    if (statusFilter === 'ditolak') return item.status?.startsWith('ditolak');
                     return true;
                   })
                   .map((item, idx) => {
@@ -1179,67 +1222,38 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                         <td>
                           {renderStatusBadge(item.status)}
                         </td>
-                        <td>
-                          {/* Aksi Verifikasi Tahap 1 */}
-                          {canVerifyTahap1 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <span style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 700 }}>
-                                Wewenang: Verifikator 1
-                              </span>
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                <button
-                                  onClick={() => openVerificationModal(item, 1, 'approve')}
-                                  style={{
-                                    background: '#16a34a',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  <Check size={14} />
-                                  <span>Setujui</span>
-                                </button>
-                                <button
-                                  onClick={() => openVerificationModal(item, 1, 'reject')}
-                                  style={{
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  <X size={14} />
-                                  <span>Tolak</span>
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                        <td style={{ minWidth: '180px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {/* Tombol Cetak Formulir Resmi BKN */}
+                            <button
+                              onClick={() => setSelectedPrintCuti(item)}
+                              style={{
+                                background: '#f8fafc',
+                                border: '1px solid #cbd5e1',
+                                color: '#1e293b',
+                                padding: '5px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                              title="Lihat & Cetak Formulir Permintaan dan Pemberian Cuti Format BKN"
+                            >
+                              <Printer size={13} style={{ color: '#16a34a' }} />
+                              <span>Formulir BKN</span>
+                            </button>
 
-                          {/* Aksi Verifikasi Tahap 2 */}
-                          {canVerifyTahap2 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <span style={{ fontSize: '0.68rem', color: '#4338ca', fontWeight: 700 }}>
-                                Wewenang: Verifikator 2 (Final)
-                              </span>
+                            {/* Aksi Petugas jika belum disetujui */}
+                            {item.status !== 'disetujui' && !item.status.startsWith('ditolak') && (
                               <div style={{ display: 'flex', gap: '6px' }}>
                                 <button
-                                  onClick={() => openVerificationModal(item, 2, 'approve')}
+                                  onClick={() => handleSelesaikanAlur(item)}
+                                  disabled={actionLoading}
                                   style={{
-                                    background: 'var(--primary-600)',
+                                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                                     color: '#fff',
                                     border: 'none',
                                     padding: '6px 10px',
@@ -1249,44 +1263,56 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px'
+                                    gap: '4px',
+                                    boxShadow: '0 2px 6px rgba(22,163,74,0.3)'
                                   }}
+                                  title="Selesaikan Alur dan Potong Kuota Cuti secara Otomatis (FIFO N-1 lalu N)"
                                 >
-                                  <CheckCircle2 size={14} />
-                                  <span>Setujui Final</span>
+                                  <CheckCircle2 size={13} />
+                                  <span>ACC & Selesaikan</span>
                                 </button>
                                 <button
                                   onClick={() => openVerificationModal(item, 2, 'reject')}
+                                  disabled={actionLoading}
                                   style={{
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 10px',
+                                    background: '#fee2e2',
+                                    color: '#b91c1c',
+                                    border: '1px solid #fca5a5',
+                                    padding: '6px 8px',
                                     borderRadius: '6px',
                                     fontSize: '0.75rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px'
+                                    gap: '3px'
                                   }}
+                                  title="Tolak Pengajuan Cuti"
                                 >
-                                  <X size={14} />
+                                  <X size={13} />
                                   <span>Tolak</span>
                                 </button>
                               </div>
-                            </div>
-                          )}
+                            )}
 
-                          {/* Info Jika Bukan Giliran Verifikasi */}
-                          {!canVerifyTahap1 && !canVerifyTahap2 && (
-                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                              {item.status === 'disetujui' ? 'Sudah selesai disetujui' :
-                               item.status.startsWith('ditolak') ? 'Berkas sudah ditolak' :
-                               item.status === 'menunggu_verif_1' ? 'Menunggu verifikasi Atasan Langsung' :
-                               'Menunggu verifikasi Kepala TU'}
-                            </span>
-                          )}
+                            {/* Info jika sudah disetujui / ditolak */}
+                            {item.status === 'disetujui' && (
+                              <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600 }}>
+                                ✓ Alur telah selesai di-ACC. Kuota pegawai resmi terpotong.
+                                {item.pemotongan && (
+                                  <div style={{ fontSize: '0.68rem', color: '#475569', fontStyle: 'italic', marginTop: '2px' }}>
+                                    {item.pemotongan.keterangan}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {item.status.startsWith('ditolak') && (
+                              <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontStyle: 'italic' }}>
+                                Pengajuan ditolak oleh petugas.
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1429,9 +1455,8 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                         }}
                       >
                         <option value="pemohon">Pegawai Biasa (Pemohon Cuti)</option>
-                        <option value="verifikator_1">Verifikator 1 (Atasan / Ketimker)</option>
-                        <option value="verifikator_2">Verifikator 2 (Kepala Bagian TU)</option>
-                        <option value="admin">Administrator Kepegawaian</option>
+                        <option value="kepegawaian">Petugas Kepegawaian (Wewenang ACC Cuti)</option>
+                        <option value="admin">Administrator Kepegawaian (Akses Penuh)</option>
                       </select>
                     </td>
                   </tr>
@@ -1476,7 +1501,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
                   <AlertCircle size={22} className="text-red-600" />
                 )}
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
-                  {verifyAction === 'approve' ? `Setujui Verifikasi Tahap ${verifyStage}` : `Tolak Pengajuan Tahap ${verifyStage}`}
+                  {verifyAction === 'approve' ? 'ACC & Setujui Cuti (Kepegawaian)' : 'Tolak Permohonan Cuti'}
                 </h3>
               </div>
               <button
@@ -1504,7 +1529,7 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
 
             <div className="form-group" style={{ marginBottom: '1.5rem' }}>
               <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                Catatan Verifikasi {verifyAction === 'reject' ? '(Wajib - Alasan Penolakan)' : '(Opsional)'}
+                Catatan Persetujuan Kepegawaian {verifyAction === 'reject' ? '(Wajib - Alasan Penolakan)' : '(Opsional)'}
               </label>
               <textarea
                 className="form-input"
@@ -1556,6 +1581,157 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL PETUNJUK ALUR SETELAH SUBMIT CUTI */}
+      {showWorkflowModal && lastSubmittedCuti && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '560px',
+            width: '100%',
+            padding: '2rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: '#dcfce7',
+                color: '#16a34a',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '1rem'
+              }}>
+                <CheckCircle2 size={36} />
+              </div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#1e293b', margin: '0 0 6px 0' }}>
+                Formulir Cuti Berhasil Dibuat!
+              </h3>
+              <div style={{
+                display: 'inline-block',
+                background: '#fef3c7',
+                color: '#b45309',
+                padding: '4px 14px',
+                borderRadius: '9999px',
+                fontSize: '0.8rem',
+                fontWeight: 800
+              }}>
+                STATUS: DALAM PROSES
+              </div>
+            </div>
+
+            {/* Kotak Instruksi Alur */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '12px',
+              padding: '1.2rem',
+              marginBottom: '1.5rem',
+              fontSize: '0.88rem',
+              lineHeight: 1.5,
+              color: '#334155'
+            }}>
+              <strong style={{ display: 'block', color: '#0f172a', marginBottom: '8px', fontSize: '0.92rem' }}>
+                Silahkan Ikuti Alur Pengajuan Cuti:
+              </strong>
+              <ol style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li>
+                  <strong>Cetak Formulir Permintaan dan Pemberian Cuti</strong> resmi (format BKN) melalui tombol di bawah.
+                </li>
+                <li>
+                  Mintakan <strong>paraf/pertimbangan Atasan Langsung</strong> pada formulir cetak fisik tersebut.
+                </li>
+                <li>
+                  Serahkan berkas fisik ke <strong>Petugas Kepegawaian</strong> untuk penyelesaian alur/ACC.
+                </li>
+              </ol>
+              <div style={{
+                marginTop: '12px',
+                padding: '8px 12px',
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                color: '#065f46',
+                fontWeight: 600
+              }}>
+                ℹ️ Catatan: Sisa kuota cuti Anda saat ini <strong>belum dipotong</strong>. Kuota akan otomatis dipotong oleh sistem setelah berkas disahkan dan di-ACC oleh Petugas Kepegawaian.
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  setShowWorkflowModal(false);
+                  setActiveTab('my-history');
+                }}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Tutup & Lihat Riwayat
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedPrintCuti(lastSubmittedCuti);
+                  setShowWorkflowModal(false);
+                  setActiveTab('my-history');
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(22,163,74,0.3)'
+                }}
+              >
+                <Printer size={16} />
+                <span>Cetak Formulir Cuti Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CETAK FORMULIR RESMI BKN */}
+      {selectedPrintCuti && (
+        <CutiFormulirBkn
+          cuti={selectedPrintCuti}
+          onClose={() => setSelectedPrintCuti(null)}
+        />
       )}
     </div>
   );

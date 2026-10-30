@@ -17,7 +17,9 @@
     "jamMasuk": "07:15:00",
     "jamPulang": "16:00:00",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "admin"
+    "sptRole": "admin",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-001",
@@ -37,7 +39,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-002",
@@ -57,7 +61,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "kobag_tu"
+    "sptRole": "kobag_tu",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-003",
@@ -77,7 +83,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-004",
@@ -97,7 +105,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-005",
@@ -117,7 +127,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-006",
@@ -137,7 +149,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-007",
@@ -157,7 +171,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-008",
@@ -177,7 +193,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-009",
@@ -197,7 +215,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-010",
@@ -217,7 +237,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-011",
@@ -237,7 +259,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-012",
@@ -257,7 +281,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-013",
@@ -277,7 +303,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-014",
@@ -297,7 +325,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-015",
@@ -317,7 +347,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-016",
@@ -337,7 +369,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-017",
@@ -357,7 +391,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "admin_sekretariat"
+    "sptRole": "admin_sekretariat",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-018",
@@ -377,7 +413,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-019",
@@ -397,7 +435,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-020",
@@ -417,7 +457,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-021",
@@ -437,7 +479,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "admin_sekretariat"
+    "sptRole": "admin_sekretariat",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-022",
@@ -457,7 +501,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-023",
@@ -477,7 +523,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-024",
@@ -497,7 +545,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-025",
@@ -517,7 +567,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-026",
@@ -537,7 +589,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-027",
@@ -557,7 +611,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-028",
@@ -577,7 +633,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-029",
@@ -597,7 +655,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-030",
@@ -617,7 +677,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-031",
@@ -637,7 +699,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-032",
@@ -657,7 +721,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-033",
@@ -677,7 +743,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-034",
@@ -697,7 +765,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-035",
@@ -717,7 +787,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-036",
@@ -737,7 +809,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-037",
@@ -757,7 +831,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-038",
@@ -777,7 +853,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-039",
@@ -797,7 +875,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-040",
@@ -817,7 +897,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-041",
@@ -837,7 +919,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-042",
@@ -857,7 +941,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-043",
@@ -877,7 +963,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-044",
@@ -897,7 +985,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-045",
@@ -917,7 +1007,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "kopoks"
+    "sptRole": "kopoks",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-046",
@@ -937,7 +1029,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-047",
@@ -957,7 +1051,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-048",
@@ -977,7 +1073,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-049",
@@ -997,7 +1095,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-050",
@@ -1017,7 +1117,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-051",
@@ -1037,7 +1139,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-052",
@@ -1057,7 +1161,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-053",
@@ -1077,7 +1183,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "kopoks"
+    "sptRole": "kopoks",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-054",
@@ -1097,7 +1205,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-055",
@@ -1117,7 +1227,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-056",
@@ -1137,7 +1249,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-057",
@@ -1157,7 +1271,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-058",
@@ -1177,7 +1293,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-059",
@@ -1197,7 +1315,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-060",
@@ -1217,7 +1337,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-061",
@@ -1237,7 +1359,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-062",
@@ -1257,7 +1381,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-063",
@@ -1277,7 +1403,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-064",
@@ -1297,7 +1425,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "kopoks"
+    "sptRole": "kopoks",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-065",
@@ -1317,7 +1447,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-066",
@@ -1337,7 +1469,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-067",
@@ -1357,7 +1491,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-068",
@@ -1377,7 +1513,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-069",
@@ -1397,7 +1535,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-070",
@@ -1417,7 +1557,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-071",
@@ -1437,7 +1579,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-072",
@@ -1457,7 +1601,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-073",
@@ -1477,7 +1623,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-074",
@@ -1497,7 +1645,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-075",
@@ -1517,7 +1667,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-076",
@@ -1537,7 +1689,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-077",
@@ -1557,7 +1711,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-078",
@@ -1577,7 +1733,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-079",
@@ -1597,7 +1755,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-080",
@@ -1617,7 +1777,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-081",
@@ -1637,7 +1799,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-082",
@@ -1657,7 +1821,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-083",
@@ -1677,7 +1843,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-084",
@@ -1697,7 +1865,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-085",
@@ -1717,7 +1887,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-086",
@@ -1737,7 +1909,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-087",
@@ -1757,7 +1931,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-088",
@@ -1777,7 +1953,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-089",
@@ -1797,7 +1975,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-090",
@@ -1817,7 +1997,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-091",
@@ -1837,7 +2019,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-092",
@@ -1857,7 +2041,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "ketimker"
+    "sptRole": "ketimker",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-093",
@@ -1877,7 +2063,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-094",
@@ -1897,7 +2085,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-095",
@@ -1917,7 +2107,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-096",
@@ -1937,7 +2129,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-097",
@@ -1957,7 +2151,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-098",
@@ -1977,7 +2173,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-099",
@@ -1997,7 +2195,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-100",
@@ -2017,7 +2217,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-101",
@@ -2037,7 +2239,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-102",
@@ -2057,7 +2261,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-103",
@@ -2077,7 +2283,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-104",
@@ -2097,7 +2305,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-105",
@@ -2117,7 +2327,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-106",
@@ -2137,7 +2349,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-107",
@@ -2157,7 +2371,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-108",
@@ -2177,7 +2393,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-109",
@@ -2197,7 +2415,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-110",
@@ -2217,7 +2437,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-111",
@@ -2237,7 +2459,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-112",
@@ -2257,7 +2481,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-113",
@@ -2277,7 +2503,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-114",
@@ -2297,7 +2525,9 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   },
   {
     "id": "PEG-115",
@@ -2317,6 +2547,8 @@
     "jamMasuk": "",
     "jamPulang": "",
     "jamKerja": "07:30:00 - 16:00:00",
-    "sptRole": "user"
+    "sptRole": "user",
+    "sisaCutiN": 12,
+    "sisaCutiN1": 0
   }
 ]

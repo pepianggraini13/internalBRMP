@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { apiService } from '../services/api';
+import { sptApiService } from './sptApi';
+import QrKeaslian from './QrKeaslian';
 import { KEMENTAN_LOGO_BASE64 } from '../data/logoData';
 import { ConflictChecker } from '../utils/conflictChecker';
 import { 
@@ -19,11 +20,15 @@ import {
   User, 
   ShieldCheck, 
   Check, 
-  FileCheck
+  FileCheck,
+  UserCheck,
+  Lock,
+  Award
 } from 'lucide-react';
 
 export default function ReportSpt({ user, onNavigateToPengajuan }) {
   const [sptList, setSptList] = useState([]);
+  const [paniteraList, setPaniteraList] = useState([]);
   const [menimbangList, setMenimbangList] = useState([]);
   const [dasarList, setDasarList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,9 +48,12 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await apiService.getSpt();
+      const res = await sptApiService.getSpt(user);
       if (res && res.sptList) {
         setSptList(res.sptList);
+      }
+      if (res && res.paniteraList) {
+        setPaniteraList(res.paniteraList);
       }
       if (res && res.menimbang) {
         setMenimbangList(res.menimbang);
@@ -62,16 +70,60 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
-  // Filtered SPT
-  const filteredSptList = sptList.filter(spt => {
+  // Evaluasi Peran Pengguna
+  const userNip = String(user?.nip || '').trim();
+  const userId = String(user?.id || user?.pegawaiId || '').toUpperCase();
+  const userRole = String(user?.sptRole || user?.role || '').toLowerCase();
+
+  const isPrivileged = 
+    userRole === 'admin' || 
+    userRole === 'kobag_tu' || 
+    userRole === 'admin_sekretariat' ||
+    userRole === 'panitera' ||
+    userId === 'PEG-ADM' ||
+    userId === 'PEG-002' ||
+    userNip === '198101312009121004' ||
+    (paniteraList || []).some(p => p.nip === userNip || p.pegawaiId === userId);
+
+  // Filter SPT: Pegawai biasa HANYA bisa melihat SPT miliknya sendiri
+  const userIsolatedSptList = sptList.filter(spt => {
+    if (isPrivileged) return true;
+
+    // Cek pemohon
+    if (spt.pemohon?.nip && spt.pemohon.nip === userNip) return true;
+    if (spt.pemohon?.id && String(spt.pemohon.id).toUpperCase() === userId) return true;
+    if (spt.pemohon?.nama && user?.nama && spt.pemohon.nama.trim().toLowerCase() === user.nama.trim().toLowerCase()) return true;
+
+    // Cek anggota / personil bertugas
+    const inAnggota = (spt.anggota || []).some(a => 
+      (a.nip && a.nip === userNip) || 
+      (a.id && String(a.id).toUpperCase() === userId) ||
+      (a.nama && user?.nama && a.nama.trim().toLowerCase() === user.nama.trim().toLowerCase())
+    );
+    if (inAnggota) return true;
+
+    const inBertugas = (spt.pegawaiBertugas || []).some(b => 
+      (b.nip && b.nip === userNip) || 
+      (b.nama && user?.nama && b.nama.trim().toLowerCase() === user.nama.trim().toLowerCase())
+    );
+    if (inBertugas) return true;
+
+    // Cek panitera pengaju
+    if (spt.paniteraPengaju?.nip && spt.paniteraPengaju.nip === userNip) return true;
+
+    return false;
+  });
+
+  // Filtered List berdasarkan Search & Status
+  const filteredSptList = userIsolatedSptList.filter(spt => {
     const statusMatch = filterStatus === 'all' || 
       (filterStatus === 'terbit' && (spt.status === 'terbit' || spt.isApproved)) ||
       (filterStatus === 'approved_kobag_tu' && spt.status === 'approved_kobag_tu') ||
-      (filterStatus === 'approved_ketimker' && spt.status === 'approved_ketimker') ||
       (filterStatus === 'diajukan' && spt.status === 'diajukan') ||
-      (filterStatus === 'selesai' && spt.status === 'selesai');
+      (filterStatus === 'selesai' && spt.status === 'selesai') ||
+      (filterStatus === 'ditolak' && spt.status === 'ditolak');
 
     const searchMatch = !searchQuery || 
       (spt.nomorSpt && spt.nomorSpt.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -80,6 +132,7 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
       (spt.kotaTujuan && spt.kotaTujuan.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (spt.tempatTujuan && spt.tempatTujuan.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (spt.uraian && spt.uraian.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (spt.paniteraPengaju?.nama && spt.paniteraPengaju.nama.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (spt.anggota && spt.anggota.some(a => a.nama.toLowerCase().includes(searchQuery.toLowerCase())));
 
     return statusMatch && searchMatch;
@@ -106,7 +159,7 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
         fileLaporanName: laporanFileName || 'Laporan_Kegiatan_Dinas_BRMP.pdf'
       };
 
-      const res = await apiService.submitLaporanSpt(laporanModalSpt.id, payload);
+      const res = await sptApiService.submitLaporan(laporanModalSpt.id, payload);
       if (res.success) {
         alert('Laporan hasil tugas dinas berhasil disimpan!');
         setLaporanModalSpt(null);
@@ -121,7 +174,7 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
 
   // Get Status Badge
   const getStatusBadge = (spt) => {
-    if (spt.status === 'terbit' || spt.isApproved) {
+    if (spt.status === 'terbit' || (spt.isApproved && spt.nomorSpt)) {
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 600 }}>
           <CheckCircle2 size={13} />
@@ -129,19 +182,11 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
         </span>
       );
     }
-    if (spt.status === 'approved_kobag_tu') {
+    if (spt.status === 'approved_kobag_tu' || spt.isApproved) {
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f3e8ff', color: '#7e22ce', border: '1px solid #e9d5ff', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 600 }}>
-          <Clock size={13} />
-          <span>Approved Kobag TU</span>
-        </span>
-      );
-    }
-    if (spt.status === 'approved_ketimker') {
-      return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 600 }}>
-          <Clock size={13} />
-          <span>Approved Ketimker</span>
+          <Check size={13} />
+          <span>Disetujui Kobag TU</span>
         </span>
       );
     }
@@ -149,334 +194,402 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 600 }}>
           <FileCheck size={13} />
-          <span>Laporan Selesai</span>
+          <span>Tugas Selesai</span>
+        </span>
+      );
+    }
+    if (spt.status === 'ditolak') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 600 }}>
+          <AlertCircle size={13} />
+          <span>Ditolak Kobag TU</span>
         </span>
       );
     }
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', padding: '4px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 600 }}>
         <Clock size={13} />
-        <span>Menunggu Persetujuan</span>
+        <span>Menunggu Kobag TU</span>
       </span>
     );
   };
 
   return (
     <div className="spt-module-container">
-      {/* Breadcrumb banner */}
+      {/* Header Banner */}
       <div className="breadcrumb-banner no-print">
         <div>
           <h1 className="breadcrumb-title">
-            <Printer size={24} style={{ color: 'var(--primary-600)' }} />
-            <span>Tracking & Cetak Naskah Dinas Resmi SPT</span>
+            <FileText size={24} style={{ color: 'var(--primary-600)' }} />
+            <span>Informasi & Tracking Surat Perintah Tugas (SPT)</span>
           </h1>
           <div className="breadcrumb-path">
             <span>KITA BRMP DIY</span>
             <span>/</span>
             <span>SPT Digital</span>
             <span>/</span>
-            <span className="current">Monitoring & Tata Naskah Dinas RI</span>
+            <span className="current">
+              {isPrivileged ? 'Arsip Seluruh SPT Dinas' : 'Informasi SPT Pribadi Pegawai'}
+            </span>
           </div>
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={onNavigateToPengajuan}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <Plus size={16} />
-          <span>+ Ajukan SPT Baru</span>
-        </button>
+
+        {onNavigateToPengajuan && isPrivileged && (
+          <button 
+            className="btn btn-primary"
+            onClick={onNavigateToPengajuan}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Plus size={16} />
+            <span>Buat Usulan SPT Baru</span>
+          </button>
+        )}
       </div>
 
-      {/* Filter Toolbar */}
+      {/* Info Banner Isolasi Data & Hak Akses */}
+      {!isPrivileged ? (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 18px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px' }}>
+          <ShieldCheck size={20} color="#16a34a" style={{ flexShrink: 0 }} />
+          <div style={{ color: '#166534', lineHeight: 1.4 }}>
+            <strong>Mode Pegawai:</strong> Anda hanya dapat melihat informasi Surat Perintah Tugas (SPT) atas nama Anda sendiri (<strong>{user?.nama || 'Pegawai'}</strong>). Pengajuan SPT hanya dapat dilakukan oleh Panitera.
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 18px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px' }}>
+          <UserCheck size={20} color="#2563eb" style={{ flexShrink: 0 }} />
+          <div style={{ color: '#1e40af', lineHeight: 1.4 }}>
+            <strong>Mode Wewenang Khusus ({userRole === 'panitera' ? 'Panitera' : userRole === 'kobag_tu' ? 'Kobag TU' : 'Administrator'}):</strong> Anda memiliki akses untuk memantau seluruh arsip SPT dinas BRMP DIY.
+          </div>
+        </div>
+      )}
+
+      {/* Filter & Search Bar */}
       <div className="card mb-4 no-print">
-        <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '260px' }}>
-            <div style={{ position: 'relative', width: '100%' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
-              <input 
-                type="text" 
-                className="form-control"
-                placeholder="🔍 Cari nomor SPT, lokasi, personil pelaksana, atau maksud tugas..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ paddingLeft: '36px', fontSize: '13px' }}
-              />
-            </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '16px' }}>
+          {/* Search Box */}
+          <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input 
+              type="text"
+              className="form-control"
+              placeholder="Cari nomor SPT, tujuan daerah, nama panitera / personil pelaksana..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ paddingLeft: '36px' }}
+            />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter size={16} className="text-gray-500" />
-            <select 
-              className="form-control"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ width: '210px', fontSize: '12.5px' }}
-            >
-              <option value="all">Semua Status Persetujuan</option>
-              <option value="terbit">SPT Terbit & Sah</option>
-              <option value="approved_kobag_tu">Approved Kobag TU</option>
-              <option value="approved_ketimker">Approved Ketimker</option>
-              <option value="diajukan">Menunggu Persetujuan</option>
-              <option value="selesai">Laporan Selesai</option>
-            </select>
+          {/* Filter Status Pills */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'all', label: 'Semua Status' },
+              { id: 'terbit', label: 'SPT Terbit' },
+              { id: 'approved_kobag_tu', label: 'Disetujui Kobag TU' },
+              { id: 'diajukan', label: 'Menunggu Approval' },
+              { id: 'selesai', label: 'Selesai' },
+              { id: 'ditolak', label: 'Ditolak' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`btn ${filterStatus === tab.id ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setFilterStatus(tab.id)}
+                style={{ fontSize: '12px', padding: '6px 12px' }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="card no-print">
-        <div className="card-body p-0">
-          <div className="table-responsive">
-            <table className="app-table">
-              <thead>
+      {/* Main Table Card */}
+      <div className="card mb-4">
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+            Daftar Surat Perintah Tugas ({filteredSptList.length} Dokumen Ditemukan)
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+            Memuat arsip data SPT...
+          </div>
+        ) : filteredSptList.length === 0 ? (
+          <div style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
+            <FileText size={40} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
+            <div style={{ fontSize: '15px', fontWeight: 600, color: '#334155' }}>
+              Tidak ada data SPT yang sesuai
+            </div>
+            <p style={{ fontSize: '13px', margin: '4px 0 0 0' }}>
+              {!isPrivileged 
+                ? 'Belum ada Surat Perintah Tugas atas nama Anda yang terdaftar.'
+                : 'Tidak ada usulan SPT dengan kriteria filter pencarian tersebut.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
                 <tr>
-                  <th style={{ width: '170px' }}>Nomor SPT / ID</th>
-                  <th>Klasifikasi & Lokasi</th>
-                  <th>Personil Pelaksana</th>
-                  <th style={{ width: '140px' }}>Jadwal Penugasan</th>
-                  <th style={{ width: '160px' }}>Status</th>
-                  <th style={{ width: '190px', textAlign: 'center' }}>Aksi & Dokumen</th>
+                  <th style={{ padding: '12px 16px' }}>Nomor & ID SPT</th>
+                  <th style={{ padding: '12px 16px' }}>Jadwal & Tujuan</th>
+                  <th style={{ padding: '12px 16px' }}>Uraian Penugasan</th>
+                  <th style={{ padding: '12px 16px' }}>Personil Bertugas</th>
+                  <th style={{ padding: '12px 16px' }}>Panitera Pengaju</th>
+                  <th style={{ padding: '12px 16px' }}>Status & QR Keaslian</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
-                      Memuat daftar SPT digital...
+                {filteredSptList.map((spt) => (
+                  <tr key={spt.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                        {spt.nomorSpt || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Menunggu Penomoran</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>
+                        {spt.id}
+                      </div>
+                    </td>
+
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 600, color: '#1e293b' }}>
+                        📍 {spt.tempatTujuan || spt.tujuanDaerah}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
+                        📅 {spt.tanggalSpt || `${spt.tglMulai} s/d ${spt.tglSelesai}`} ({spt.lamaHari || `${spt.durasiHari || 1} hari`})
+                      </div>
+                    </td>
+
+                    <td style={{ padding: '12px 16px', maxWidth: '280px' }}>
+                      <div style={{ color: '#334155', lineHeight: 1.4 }}>
+                        {spt.uraian || spt.untukMelaksanakan}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--primary-700)', fontWeight: 600, marginTop: '3px' }}>
+                        {spt.klasifikasiNama}
+                      </div>
+                    </td>
+
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>
+                        {spt.anggota?.[0]?.nama || 'Personil BRMP'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>
+                        {(spt.anggota?.length || 1) > 1 
+                          ? `+ ${(spt.anggota?.length || 1) - 1} Anggota Lainnya` 
+                          : 'Personil Tunggal'}
+                      </div>
+                    </td>
+
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontSize: '12px', color: '#1e293b', fontWeight: 600 }}>
+                        {spt.paniteraPengaju?.nama || "Devi Eka Nuvitasari, S.H."}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
+                        Panitera Resmi
+                      </div>
+                    </td>
+
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div>{getStatusBadge(spt)}</div>
+                        {/* Mini QR Badge */}
+                        <div 
+                          onClick={() => setPrintSpt(spt)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: '#16a34a', cursor: 'pointer', fontWeight: 600 }}
+                          title="Lihat Sertifikat QR Keaslian"
+                        >
+                          <ShieldCheck size={12} />
+                          <span>QR Keaslian: {spt.keaslian?.tglPengesahan || spt.tglPengajuan}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setDetailSpt(spt)}
+                          className="btn btn-secondary"
+                          style={{ padding: '6px 10px', fontSize: '12px' }}
+                          title="Lihat Rincian SPT & Timeline"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPrintSpt(spt)}
+                          className="btn btn-primary"
+                          style={{ padding: '6px 10px', fontSize: '12px' }}
+                          title="Cetak Naskah Resmi SPT dengan QR Code Keaslian"
+                        >
+                          <Printer size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openLaporanModal(spt)}
+                          className="btn btn-secondary"
+                          style={{ padding: '6px 10px', fontSize: '12px' }}
+                          title="Unggah Laporan Hasil Tugas"
+                        >
+                          <Upload size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ) : filteredSptList.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Tidak ada data Surat Perintah Tugas yang sesuai dengan filter.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredSptList.map((spt) => {
-                    const members = spt.anggota || spt.pegawaiBertugas || [];
-                    const isApproved = spt.status === 'terbit' || spt.isApproved;
-
-                    return (
-                      <tr key={spt.id}>
-                        <td>
-                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>
-                            {spt.nomorSpt || `(Draft #${spt.id})`}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                            Diajukan: {spt.tglPengajuan || spt.tanggalEntri || '-'}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '12.5px' }}>
-                            {spt.klasifikasiNama || 'Perjalanan Dinas'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
-                            <MapPin size={13} className="text-red-500" />
-                            <span>{spt.tempatTujuan || spt.tujuanDaerah || spt.kotaTujuan}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            {members.slice(0, 2).map((m, idx) => (
-                              <div key={idx} style={{ fontSize: '12px' }}>
-                                <strong>{m.nama}</strong>
-                                <span style={{ fontSize: '10.5px', color: '#64748b', marginLeft: '4px' }}>
-                                  ({m.peranDalamTugas || 'Pelaksana'})
-                                </span>
-                              </div>
-                            ))}
-                            {members.length > 2 && (
-                              <span style={{ fontSize: '11px', color: 'var(--primary-700)', fontWeight: 600 }}>
-                                +{members.length - 2} personil lainnya
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ fontSize: '12px', fontWeight: 600 }}>
-                            {spt.tanggalSpt || `${spt.tglMulai || spt.dariTanggal} s/d ${spt.tglSelesai || spt.sampaiTanggal}`}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                            Durasi: {spt.lamaHari || `${spt.durasiHari || 1} hari`}
-                          </div>
-                        </td>
-                        <td>
-                          {getStatusBadge(spt)}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', gap: '6px' }}>
-                            {/* Tombol Detail Timeline */}
-                            <button
-                              className="btn btn-secondary btn-sm"
-                              title="Lihat Histori Tracking Timeline"
-                              onClick={() => setDetailSpt(spt)}
-                              style={{ padding: '5px 8px' }}
-                            >
-                              <Eye size={14} />
-                            </button>
-
-                            {/* Tombol Cetak Naskah Dinas Resmi */}
-                            <button
-                              className={`btn btn-sm ${isApproved ? 'btn-primary' : 'btn-secondary'}`}
-                              title={isApproved ? "Cetak Naskah Dinas Resmi Standar Kementerian Pertanian" : "Pratinjau Draf Naskah Dinas Resmi"}
-                              onClick={() => setPrintSpt(spt)}
-                              style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <Printer size={14} />
-                              <span style={{ fontSize: '11.5px' }}>{isApproved ? 'Cetak' : 'Draf'}</span>
-                            </button>
-
-                            {/* Tombol Laporan Penugasan */}
-                            <button
-                              className={`btn btn-sm ${spt.laporan ? 'btn-success' : 'btn-secondary'}`}
-                              title="Unggah / Lihat Laporan Hasil Penugasan Dinas"
-                              onClick={() => openLaporanModal(spt)}
-                              style={{ padding: '5px 8px' }}
-                            >
-                              <Upload size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                ))}
               </tbody>
             </table>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* =========================================================================
-          MODAL 1: PREVIEW & CETAK FORMAT RESMI NASKAH DINAS STANDAR KEMENTAN RI
-          ========================================================================= */}
+      {/* ======================================================== */}
+      {/* MODAL 1: PRATINJAU & CETAK DOKUMEN NASKAH RESMI SPT      */}
+      {/* ======================================================== */}
       {printSpt && (
-        <div className="modal-overlay" id="previewModal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-dialog modal-xl" style={{ maxWidth: '900px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="modal-header no-print" style={{ padding: '14px 20px', background: '#1e293b', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div 
+          className="modal-backdrop"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+            overflowY: 'auto'
+          }}
+          onClick={() => setPrintSpt(null)}
+        >
+          <div 
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              maxWidth: '850px',
+              width: '100%',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="no-print" style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Printer size={20} className="text-emerald-400" />
-                <h3 style={{ margin: 0, fontSize: '15px', color: '#fff', fontWeight: 600 }}>
-                  Format Resmi Naskah Dinas SPT Standar Kementerian Pertanian RI
-                </h3>
+                <Printer size={18} color="var(--primary-600)" />
+                <span style={{ fontWeight: 700, fontSize: '14px' }}>
+                  Format Naskah Resmi Surat Perintah Tugas (SPT) - Standar Kementan RI
+                </span>
               </div>
               <button 
+                type="button"
                 onClick={() => setPrintSpt(null)}
-                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '22px', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
-                &times;
+                <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body" style={{ overflowY: 'auto', padding: '24px', background: '#f8fafc' }}>
-              {/* Official A4 Document Container */}
-              <div 
-                className="spt-official-document" 
-                style={{ 
-                  background: '#ffffff', 
-                  padding: '30px 40px', 
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.08)', 
-                  borderRadius: '4px',
-                  fontFamily: '"Bookman Old Style", "Times New Roman", Georgia, serif',
-                  color: '#000000',
-                  lineHeight: 1.35,
-                  fontSize: '11pt'
-                }}
-              >
-                {/* KOP SURAT RESMI */}
-                <header className="spt-kop" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
-                  <div className="kop-logo" style={{ flexShrink: 0 }}>
-                    <img 
-                      src={KEMENTAN_LOGO_BASE64 || '/logo-kementan.png'} 
-                      alt="Logo Kementerian Pertanian" 
-                      style={{ width: '82px', height: '82px', objectFit: 'contain' }}
-                    />
-                  </div>
-                  <div className="kop-text" style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: '14pt', fontWeight: 'bold', letterSpacing: '0.5px' }}>KEMENTERIAN PERTANIAN</div>
-                    <div style={{ fontSize: '12pt', fontWeight: 'bold' }}>BADAN STANDARDISASI INSTRUMEN PERTANIAN</div>
-                    <div style={{ fontSize: '13pt', fontWeight: 'bold' }}>BALAI PENERAPAN STANDAR INSTRUMEN PERTANIAN</div>
-                    <div style={{ fontSize: '12pt', fontWeight: 'bold', letterSpacing: '0.5px' }}>DAERAH ISTIMEWA YOGYAKARTA (BRMP DIY)</div>
-                    <div style={{ fontSize: '8.5pt', marginTop: '4px', lineHeight: 1.25 }}>
-                      Jl. Stadion Maguwoharjo No. 22, Karangsari, Wedomartani, Ngemplak, Sleman, D.I. Yogyakarta 55584<br />
-                      Telepon (0274) 884662 | Faksimili (0274) 884663 | Surel: brmp-diy@pertanian.go.id | Laman: brmpdiy.pertanian.go.id
+            {/* Document Body (Printable Area) */}
+            <div style={{ padding: '30px 40px', overflowY: 'auto', flex: 1, background: '#fff', color: '#000', fontFamily: 'serif' }}>
+              <div className="spt-official-document">
+                {/* KOP RESMI KEMENTAN RI */}
+                <header style={{ display: 'flex', alignItems: 'center', gap: '16px', borderBottom: '3px double #000', paddingBottom: '10px', marginBottom: '16px' }}>
+                  <img 
+                    src={KEMENTAN_LOGO_BASE64} 
+                    alt="Logo Kementerian Pertanian RI" 
+                    style={{ width: '80px', height: '80px', objectFit: 'contain' }}
+                  />
+                  <div style={{ textAlign: 'center', flex: 1 }}>
+                    <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                      KEMENTERIAN PERTANIAN
+                    </div>
+                    <div style={{ fontSize: '11pt', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                      BADAN STANDARDISASI INSTRUMEN PERTANIAN
+                    </div>
+                    <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                      BALAI PENERAPAN STANDAR INSTRUMEN PERTANIAN D.I. YOGYAKARTA
+                    </div>
+                    <div style={{ fontSize: '9pt', fontStyle: 'italic', marginTop: '2px', fontFamily: 'sans-serif' }}>
+                      Jl. Stadion Maguwoharjo No. 22, Karangsari, Wedomartani, Ngemplak, Sleman, D.I. Yogyakarta 55584
+                    </div>
+                    <div style={{ fontSize: '8.5pt', fontFamily: 'sans-serif' }}>
+                      Telepon: (0274) 884662 | Faksimili: (0274) 884662 | Pos-el: brmp.diy@pertanian.go.id
                     </div>
                   </div>
                 </header>
 
-                {/* GARIS KOP SURAT TEBAL & TIPIS */}
-                <div style={{ borderBottom: '3px solid #000', marginBottom: '1.5px' }}></div>
-                <div style={{ borderBottom: '1px solid #000', marginBottom: '20px' }}></div>
-
-                {/* JUDUL SURAT */}
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '13.5pt', fontWeight: 'bold', textDecoration: 'underline', margin: '0 0 4px 0' }}>
+                {/* JUDUL & NOMOR SURAT */}
+                <div style={{ textAlign: 'center', margin: '20px 0 16px 0' }}>
+                  <div style={{ fontSize: '13pt', fontWeight: 'bold', textDecoration: 'underline', letterSpacing: '0.5px' }}>
                     SURAT PERINTAH TUGAS
-                  </h2>
-                  <div style={{ fontSize: '11pt', fontWeight: 'bold' }}>
-                    Nomor: {printSpt.nomorSpt || 'B-......../KP.320/H.14.7/10/2026 (DRAF USULAN)'}
+                  </div>
+                  <div style={{ fontSize: '10.5pt', fontWeight: 'bold', marginTop: '4px' }}>
+                    NOMOR: {printSpt.nomorSpt || `USULAN-${printSpt.id}`}
                   </div>
                 </div>
 
-                {/* KONSIDERANS MENIMBANG */}
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', marginBottom: '14px', fontSize: '10.5pt' }}>
-                  <div style={{ fontWeight: 'bold' }}>Menimbang :</div>
+                {/* MENIMBANG */}
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 10px 1fr', fontSize: '10.5pt', lineHeight: 1.5, marginBottom: '10px' }}>
+                  <div style={{ fontWeight: 'bold' }}>Menimbang</div>
+                  <div>:</div>
                   <div>
-                    {menimbangList.map((m, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '4px', textAlign: 'justify' }}>
-                        <span style={{ fontWeight: 'bold' }}>{String.fromCharCode(97 + idx)}.</span>
-                        <span>{m}</span>
-                      </div>
-                    ))}
+                    <ol style={{ margin: 0, paddingLeft: '18px' }}>
+                      {menimbangList.map((item, idx) => (
+                        <li key={idx} style={{ marginBottom: '4px', textAlign: 'justify' }}>{item}</li>
+                      ))}
+                    </ol>
                   </div>
                 </div>
 
-                {/* KONSIDERANS DASAR */}
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', marginBottom: '18px', fontSize: '10.5pt' }}>
-                  <div style={{ fontWeight: 'bold' }}>Dasar :</div>
+                {/* DASAR */}
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 10px 1fr', fontSize: '10.5pt', lineHeight: 1.5, marginBottom: '16px' }}>
+                  <div style={{ fontWeight: 'bold' }}>Dasar</div>
+                  <div>:</div>
                   <div>
-                    {dasarList.map((d, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '4px', textAlign: 'justify' }}>
-                        <span style={{ fontWeight: 'bold' }}>{idx + 1}.</span>
-                        <span>{d}</span>
-                      </div>
-                    ))}
+                    <ol style={{ margin: 0, paddingLeft: '18px' }}>
+                      {dasarList.map((item, idx) => (
+                        <li key={idx} style={{ marginBottom: '4px', textAlign: 'justify' }}>{item}</li>
+                      ))}
+                    </ol>
                   </div>
                 </div>
 
-                {/* MEMERINTAHKAN */}
-                <div style={{ textAlign: 'center', fontWeight: 'bold', margin: '14px 0 10px 0', letterSpacing: '1px' }}>
-                  MEMERINTAHKAN:
+                {/* MEMBERI PERINTAH */}
+                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '11pt', margin: '14px 0' }}>
+                  MEMBERI PERINTAH:
                 </div>
 
                 {/* KEPADA */}
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', marginBottom: '14px', fontSize: '10.5pt' }}>
-                  <div style={{ fontWeight: 'bold' }}>Kepada :</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 10px 1fr', fontSize: '10.5pt', lineHeight: 1.5, marginBottom: '14px' }}>
+                  <div style={{ fontWeight: 'bold' }}>Kepada</div>
+                  <div>:</div>
                   <div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '10pt' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt', marginTop: '2px' }}>
                       <thead>
-                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #000' }}>
-                          <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'center', width: '32px' }}>No.</th>
-                          <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'left' }}>Nama / NIP</th>
-                          <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'center', width: '60px' }}>Gol.</th>
-                          <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'left' }}>Jabatan Kedinasan</th>
-                          <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'center', width: '130px' }}>Peran Penugasan</th>
+                        <tr style={{ borderBottom: '1px solid #000' }}>
+                          <th style={{ padding: '4px 6px', textAlign: 'left', width: '25px' }}>No</th>
+                          <th style={{ padding: '4px 6px', textAlign: 'left' }}>Nama / NIP</th>
+                          <th style={{ padding: '4px 6px', textAlign: 'left' }}>Pangkat / Gol</th>
+                          <th style={{ padding: '4px 6px', textAlign: 'left' }}>Jabatan</th>
+                          <th style={{ padding: '4px 6px', textAlign: 'left' }}>Peran Tugas</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(printSpt.anggota || printSpt.pegawaiBertugas || []).map((ang, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #000' }}>
-                            <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center' }}>{idx + 1}.</td>
-                            <td style={{ border: '1px solid #000', padding: '5px' }}>
-                              <div style={{ fontWeight: 'bold' }}>{ang.nama}</div>
-                              <div style={{ fontSize: '9pt', color: '#333' }}>NIP. {ang.nip || '-'}</div>
+                        {(printSpt.anggota || printSpt.pegawaiBertugas || []).map((ang, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                            <td style={{ padding: '4px 6px', verticalAlign: 'top' }}>{i + 1}.</td>
+                            <td style={{ padding: '4px 6px', verticalAlign: 'top' }}>
+                              <strong>{ang.nama}</strong><br />
+                              NIP. {ang.nip || '-'}
                             </td>
-                            <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center' }}>{ang.golongan || '-'}</td>
-                            <td style={{ border: '1px solid #000', padding: '5px' }}>{ang.jabatan || '-'}</td>
-                            <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center', fontWeight: 'bold' }}>
-                              {ang.peranDalamTugas || (idx === 0 ? 'Penanggung Jawab (PJ)' : 'Anggota Pelaksana')}
-                            </td>
+                            <td style={{ padding: '4px 6px', verticalAlign: 'top' }}>{ang.golongan || '-'}</td>
+                            <td style={{ padding: '4px 6px', verticalAlign: 'top' }}>{ang.jabatan || 'Pegawai BRMP'}</td>
+                            <td style={{ padding: '4px 6px', verticalAlign: 'top' }}>{ang.peranDalamTugas || 'Pelaksana'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -485,18 +598,21 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
                 </div>
 
                 {/* UNTUK */}
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', marginBottom: '24px', fontSize: '10.5pt' }}>
-                  <div style={{ fontWeight: 'bold' }}>Untuk :</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 10px 1fr', fontSize: '10.5pt', lineHeight: 1.5, marginBottom: '18px' }}>
+                  <div style={{ fontWeight: 'bold' }}>Untuk</div>
+                  <div>:</div>
                   <div>
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '5px', textAlign: 'justify' }}>
                       <span style={{ fontWeight: 'bold' }}>1.</span>
-                      <span>Melaksanakan tugas dinas: <strong>{printSpt.uraian || printSpt.untukMelaksanakan}</strong></span>
+                      <span>{printSpt.uraian || printSpt.untukMelaksanakan}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '5px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '5px', textAlign: 'justify' }}>
                       <span style={{ fontWeight: 'bold' }}>2.</span>
-                      <span>Tempat / Lokasi Penugasan: <strong>{printSpt.tempatTujuan || printSpt.tujuanDaerah || printSpt.kotaTujuan}</strong></span>
+                      <span>
+                        Lokasi / Tempat Tujuan: <strong>{printSpt.tempatTujuan || printSpt.kotaTujuan || printSpt.tujuanDaerah}</strong>
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '5px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '5px', textAlign: 'justify' }}>
                       <span style={{ fontWeight: 'bold' }}>3.</span>
                       <span>
                         Waktu Pelaksanaan: Selama <strong>{printSpt.lamaHari || `${printSpt.durasiHari || 1} hari`}</strong> pada tanggal <strong>{printSpt.tanggalSpt || `${printSpt.tglMulai || printSpt.dariTanggal} s/d ${printSpt.tglSelesai || printSpt.sampaiTanggal}`}</strong>
@@ -505,11 +621,17 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '5px', textAlign: 'justify' }}>
                       <span style={{ fontWeight: 'bold' }}>4.</span>
                       <span>
-                        Biaya yang timbul akibat pelaksanaan Surat Perintah Tugas ini dibebankan pada DIPA Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta Tahun Anggaran Berjalan.
+                        Pengajuan ini diajukan secara resmi oleh Panitera: <strong>{printSpt.paniteraPengaju?.nama || "Devi Eka Nuvitasari, S.H."}</strong> dan telah memperoleh persetujuan tunggal dari Kepala Bagian Tata Usaha (Kobag TU).
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '5px', textAlign: 'justify' }}>
                       <span style={{ fontWeight: 'bold' }}>5.</span>
+                      <span>
+                        Biaya yang timbul akibat pelaksanaan Surat Perintah Tugas ini dibebankan pada DIPA Balai Penerapan Standar Instrumen Pertanian D.I. Yogyakarta Tahun Anggaran Berjalan.
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '5px', textAlign: 'justify' }}>
+                      <span style={{ fontWeight: 'bold' }}>6.</span>
                       <span>
                         Setelah selesai melaksanakan tugas, pelaksana wajib menyampaikan laporan tertulis hasil pelaksanaan kegiatan kepada Kepala Balai.
                       </span>
@@ -517,27 +639,22 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
                   </div>
                 </div>
 
-                {/* TANDA TANGAN & PENGESAHAN KEPALA BALAI */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', marginTop: '20px', fontSize: '10.5pt' }}>
+                {/* TANDA TANGAN & QR CODE KEASLIAN */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', marginTop: '24px', fontSize: '10.5pt' }}>
                   <div></div>
                   <div style={{ textAlign: 'left' }}>
                     <div>Ditetapkan di: Yogyakarta</div>
-                    <div>Pada tanggal: {ConflictChecker.formatDateIndo(printSpt.tglPengajuan || printSpt.dariTanggal)}</div>
+                    <div>
+                      Pada tanggal: <strong>{ConflictChecker.formatDateIndo(printSpt.keaslian?.tglPengesahan || printSpt.tglPengesahan || printSpt.tglPengajuan || printSpt.dariTanggal)}</strong>
+                    </div>
                     <div style={{ marginTop: '8px', fontWeight: 'bold' }}>
                       Kepala Balai Penerapan Standar<br />
                       Instrumen Pertanian D.I. Yogyakarta,
                     </div>
 
-                    {/* Stempel & Barcode Signature simulation */}
-                    <div style={{ margin: '14px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ border: '1px solid #16a34a', padding: '6px 10px', borderRadius: '4px', fontSize: '8.5pt', color: '#16a34a', textAlign: 'center', lineHeight: 1.2 }}>
-                        <div style={{ fontWeight: 'bold' }}>BSRE KEMENTAN</div>
-                        <div>Tersertifikasi Elektronik</div>
-                        <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>ID: {printSpt.id}</div>
-                      </div>
-                      <div style={{ width: '48px', height: '48px', border: '1px dashed #64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8pt', color: '#64748b' }}>
-                        QR Code
-                      </div>
+                    {/* QR Code Keaslian dengan Tanggal & Validasi BSRE */}
+                    <div style={{ margin: '14px 0' }}>
+                      <QrKeaslian spt={printSpt} size={110} showDetails={true} />
                     </div>
 
                     <div style={{ fontWeight: 'bold', textDecoration: 'underline' }}>
@@ -549,6 +666,7 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
               </div>
             </div>
 
+            {/* Modal Footer */}
             <div className="modal-footer no-print" style={{ padding: '14px 20px', background: '#fff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button 
                 type="button"
@@ -571,165 +689,194 @@ export default function ReportSpt({ user, onNavigateToPengajuan }) {
         </div>
       )}
 
-      {/* =========================================================================
-          MODAL 2: DETAIL SPT & TIMELINE TRACKING ALUR
-          ========================================================================= */}
+      {/* ======================================================== */}
+      {/* MODAL 2: RINCIAN SPT, PANITERA & TIMELINE APPROVAL       */}
+      {/* ======================================================== */}
       {detailSpt && (
-        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-dialog" style={{ maxWidth: '640px', width: '90%', background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
-            <div className="modal-header" style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={18} style={{ color: 'var(--primary-600)' }} />
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>
-                  Detail & Histori Tracking Alur SPT
+        <div 
+          className="modal-backdrop"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
+          onClick={() => setDetailSpt(null)}
+        >
+          <div 
+            style={{ background: '#fff', borderRadius: '14px', maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '16px' }}>
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-700)', background: 'var(--primary-50)', padding: '3px 8px', borderRadius: '4px' }}>
+                  {detailSpt.id}
+                </span>
+                <h3 style={{ margin: '6px 0 0 0', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                  {detailSpt.nomorSpt || 'Usulan Surat Perintah Tugas'}
                 </h3>
               </div>
-              <button onClick={() => setDetailSpt(null)} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }}>&times;</button>
+              <button type="button" onClick={() => setDetailSpt(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="modal-body" style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
-              <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                  {detailSpt.nomorSpt || `Draft #${detailSpt.id}`}
-                </div>
-                <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '4px' }}>
-                  {detailSpt.uraian || detailSpt.untukMelaksanakan}
-                </div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-                  Tujuan: {detailSpt.tempatTujuan || detailSpt.tujuanDaerah} • Waktu: {detailSpt.tanggalSpt || detailSpt.dariTanggal}
-                </div>
-              </div>
-
-              {/* Status Note Catatan */}
-              {detailSpt.catatanKetimker && (
-                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', padding: '10px', fontSize: '12px', marginBottom: '10px' }}>
-                  <strong>Catatan Ketimker:</strong> {detailSpt.catatanKetimker}
-                </div>
-              )}
-              {detailSpt.catatanKobagTu && (
-                <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '6px', padding: '10px', fontSize: '12px', marginBottom: '16px' }}>
-                  <strong>Catatan Kobag TU:</strong> {detailSpt.catatanKobagTu}
-                </div>
-              )}
-
-              {/* Timeline Stepper */}
-              <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: '#1e293b' }}>
-                Jejak Alur Persetujuan & Penerbitan:
-              </h4>
-
-              <div style={{ borderLeft: '2px solid #e2e8f0', marginLeft: '12px', paddingLeft: '16px' }}>
-                {(detailSpt.timeline || []).map((tl, i) => (
-                  <div key={i} style={{ position: 'relative', marginBottom: '16px' }}>
-                    <div style={{ position: 'absolute', left: '-23px', top: '2px', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--primary-600)', border: '2px solid #fff', boxShadow: '0 0 0 2px var(--primary-200)' }}></div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{tl.aksi}</div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>Oleh: {tl.aktor} • {tl.waktu}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '10px' }}>
+                <QrKeaslian spt={detailSpt} size={80} showDetails={false} />
+                <div>
+                  <div style={{ fontWeight: 700, color: '#166534', fontSize: '13.5px' }}>
+                    Sertifikasi QR Keaslian Dokumen
                   </div>
-                ))}
+                  <div style={{ color: '#475569', fontSize: '12px', marginTop: '2px' }}>
+                    Tanggal Pengesahan: <strong>{detailSpt.keaslian?.tglPengesahan || detailSpt.tglPengesahan || detailSpt.tglPengajuan}</strong>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '11.5px', marginTop: '2px' }}>
+                    Approval Tunggal: <strong>Agung Ariyanto, SEI., M.Ec., Dev. (Kobag TU)</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', display: 'block', marginBottom: '2px' }}>Maksud Penugasan Kedinasan:</span>
+                <div style={{ fontWeight: 600, color: '#1e293b' }}>{detailSpt.uraian || detailSpt.untukMelaksanakan}</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '2px' }}>Tujuan Wilayah:</span>
+                  <div style={{ fontWeight: 600, color: '#1e293b' }}>📍 {detailSpt.tempatTujuan || detailSpt.tujuanDaerah}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '2px' }}>Tanggal Pelaksanaan:</span>
+                  <div style={{ fontWeight: 600, color: '#1e293b' }}>📅 {detailSpt.tanggalSpt} ({detailSpt.lamaHari})</div>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', display: 'block', marginBottom: '4px' }}>Panitera Pengaju:</span>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: '6px', color: '#166534', fontWeight: 600 }}>
+                  ✍️ {detailSpt.paniteraPengaju?.nama || "Devi Eka Nuvitasari, S.H."} (Panitera Resmi BRMP)
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', display: 'block', marginBottom: '6px' }}>Personil Pelaksana Tugas:</span>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                  {(detailSpt.anggota || detailSpt.pegawaiBertugas || []).map((ang, i) => (
+                    <div key={i} style={{ padding: '8px 12px', borderBottom: i === (detailSpt.anggota?.length || 1) - 1 ? 'none' : '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{ang.nama}</strong>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>NIP. {ang.nip}</div>
+                      </div>
+                      <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', color: '#475569' }}>
+                        {ang.peranDalamTugas || 'Pelaksana'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Timeline Status */}
+              <div>
+                <span style={{ color: '#64748b', display: 'block', marginBottom: '6px' }}>Jejak Audit & Verifikasi:</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(detailSpt.timeline || []).map((tl, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '10px', fontSize: '12px' }}>
+                      <span style={{ color: '#64748b', minWidth: '105px', fontFamily: 'monospace' }}>{tl.waktu}</span>
+                      <div>
+                        <strong>{tl.aktor}</strong>: {tl.aksi}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="modal-footer" style={{ padding: '12px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setDetailSpt(null)}>Tutup</button>
+            <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setDetailSpt(null)}>
+                Tutup
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                onClick={() => {
+                  const s = detailSpt;
+                  setDetailSpt(null);
+                  setPrintSpt(s);
+                }}
+              >
+                Cetak Naskah Resmi
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* =========================================================================
-          MODAL 3: UPLOAD LAPORAN HASIL PENUGASAN DINAS (MAKS 2MB)
-          ========================================================================= */}
+      {/* ======================================================== */}
+      {/* MODAL 3: UNGGAH LAPORAN & FOTO PERTANGGUNGJAWABAN       */}
+      {/* ======================================================== */}
       {laporanModalSpt && (
-        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-dialog" style={{ maxWidth: '580px', width: '90%', background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
-            <div className="modal-header" style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Upload size={18} className="text-emerald-600" />
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>
-                  Upload Laporan Hasil Penugasan Kedinasan
-                </h3>
-              </div>
-              <button onClick={() => setLaporanModalSpt(null)} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }}>&times;</button>
+        <div 
+          className="modal-backdrop"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
+          onClick={() => setLaporanModalSpt(null)}
+        >
+          <div 
+            style={{ background: '#fff', borderRadius: '14px', maxWidth: '580px', width: '100%', padding: '24px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                Pelaporan Hasil Tugas Dinas ({laporanModalSpt.id})
+              </h3>
+              <button type="button" onClick={() => setLaporanModalSpt(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={18} />
+              </button>
             </div>
 
             <form onSubmit={handleSaveLaporan}>
-              <div className="modal-body" style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
-                <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', marginBottom: '16px' }}>
-                  <strong>SPT:</strong> {laporanModalSpt.nomorSpt || laporanModalSpt.id} — {laporanModalSpt.tujuanDaerah}
-                </div>
-
-                <div className="form-group mb-3">
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '13px' }}>
-                    Ringkasan Hasil Pelaksanaan Tugas <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <textarea
-                    className="form-control"
-                    rows={4}
-                    value={isiLaporanText}
-                    onChange={(e) => setIsiLaporanText(e.target.value)}
-                    placeholder="Uraikan hasil pertemuan, temuan lapangan, tindak lanjut, dan capaian target penugasan..."
-                    required
-                  />
-                  <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px' }}>
-                    Sesuai SOP BRMP DIY, laporan tertulis wajib disampaikan paling lambat 5 hari setelah penugasan.
-                  </div>
-                </div>
-
-                <div className="form-group mb-3">
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '13px' }}>
-                    File Dokumen Laporan (PDF / DOC maks 2MB)
-                  </label>
-                  <input 
-                    type="file" 
-                    className="form-control"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setLaporanFileName(e.target.files[0].name);
-                      }
-                    }}
-                  />
-                  {laporanFileName && (
-                    <div style={{ fontSize: '11.5px', color: '#16a34a', marginTop: '4px' }}>
-                      ✓ Terpilih: {laporanFileName}
-                    </div>
-                  )}
-                </div>
-
-                <div className="form-group mb-3">
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '13px' }}>
-                    Tautan Foto Dokumentasi Lapangan (Opsional)
-                  </label>
-                  <input 
-                    type="url" 
-                    className="form-control"
-                    placeholder="https://images.unsplash.com/... atau URL foto kegiatan"
-                    value={photoUrl}
-                    onChange={(e) => setPhotoUrl(e.target.value)}
-                  />
-                </div>
-
-                {/* Foto Dokumentasi yang sudah ada */}
-                {laporanModalSpt.laporan?.fotoDokumentasi && laporanModalSpt.laporan.fotoDokumentasi.length > 0 && (
-                  <div style={{ marginTop: '14px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>Galeri Foto Dokumentasi:</div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {laporanModalSpt.laporan.fotoDokumentasi.map((foto, idx) => (
-                        <img 
-                          key={idx}
-                          src={foto.url} 
-                          alt="Dokumentasi" 
-                          style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  Uraian Hasil Pelaksanaan Tugas Lapangan:
+                </label>
+                <textarea 
+                  className="form-control"
+                  rows={4}
+                  placeholder="Deskripsikan capaian bimbingan teknis / koordinasi / pengujian yang telah terlaksana..."
+                  value={isiLaporanText}
+                  onChange={(e) => setIsiLaporanText(e.target.value)}
+                  required
+                />
               </div>
 
-              <div className="modal-footer" style={{ padding: '12px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setLaporanModalSpt(null)}>Batal</button>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  Tautan URL Foto Dokumentasi Kegiatan:
+                </label>
+                <input 
+                  type="url"
+                  className="form-control"
+                  placeholder="https://... atau foto dokumentasi kegiatan lapangan"
+                  value={photoUrl}
+                  onChange={(e) => setPhotoUrl(e.target.value)}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  Nama Berkas Laporan Resmi (PDF):
+                </label>
+                <input 
+                  type="text"
+                  className="form-control"
+                  placeholder="Contoh: Laporan_Bimtek_BPP_Sentolo.pdf"
+                  value={laporanFileName}
+                  onChange={(e) => setLaporanFileName(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setLaporanModalSpt(null)}>
+                  Batal
+                </button>
                 <button type="submit" className="btn btn-primary" disabled={savingLaporan}>
-                  {savingLaporan ? 'Menyimpan...' : 'Simpan Laporan Kegiatan'}
+                  {savingLaporan ? 'Menyimpan...' : 'Simpan Laporan Tugas'}
                 </button>
               </div>
             </form>

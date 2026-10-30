@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Login from './components/Login';
@@ -98,14 +98,20 @@ export default function App() {
     setUser(mergedUser);
     localStorage.setItem('brmp_user', JSON.stringify(mergedUser));
 
-    if (fromAdminGate) {
-      // Pintu 1: Login dari Panel Admin -> langsung diarahkan ke Dashboard Admin
+    const isAdminUser = Boolean(
+      mergedUser.systemRole === 'admin' ||
+      mergedUser.role === 'admin' ||
+      mergedUser.approvalRole === 'admin' ||
+      mergedUser.nip === '198001012005011001' ||
+      mergedUser.id === 'PEG-ADM'
+    );
+
+    if (isAdminUser || fromAdminGate) {
       setCurrentView('admin-dashboard');
       if (typeof window !== 'undefined' && window.location.hash !== '#/admin' && !window.location.pathname.includes('/admin')) {
         window.history.pushState(null, '', '#/admin');
       }
     } else {
-      // Pintu 2: Login dari Gerbang Biasa (/) -> diarahkan ke Halaman Biasa Pegawai untuk cek tampilan
       setCurrentView('dashboard');
     }
   };
@@ -205,7 +211,7 @@ export default function App() {
         {/* Dynamic Main View */}
         <main className={`main-content ${isSptView ? 'flush-view' : ''}`}>
           {currentView === 'dashboard' && (
-            (isUserAdmin && isAdminRoute) ? (
+            isUserAdmin ? (
               <AdminDashboard 
                 user={user} 
                 onNavigate={setCurrentView} 

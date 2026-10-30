@@ -19,10 +19,16 @@ $clientIp = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 // Touch machine status in database
 if ($useMysql && $pdo && !empty($sn) && $sn !== 'SN_UNKNOWN') {
     try {
-        $stmt = $pdo->prepare("INSERT INTO tb_adms_machines (sn, nama_mesin, ip, last_sync, status, total_logs) 
-            VALUES (?, 'Mesin Absensi Lobi Utama BRMP DIY', ?, NOW(), 'Online', 0) 
-            ON DUPLICATE KEY UPDATE ip = VALUES(ip), last_sync = NOW(), status = 'Online'");
-        $stmt->execute([$sn, $clientIp]);
+        if (!empty($isSqlite)) {
+            $stmt = $pdo->prepare("INSERT OR REPLACE INTO tb_adms_machines (sn, nama_mesin, ip, last_sync, status, total_logs) 
+                VALUES (?, 'Mesin Absensi Lobi Utama BRMP DIY', ?, datetime('now', 'localtime'), 'Online', 0)");
+            $stmt->execute([$sn, $clientIp]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO tb_adms_machines (sn, nama_mesin, ip, last_sync, status, total_logs) 
+                VALUES (?, 'Mesin Absensi Lobi Utama BRMP DIY', ?, NOW(), 'Online', 0) 
+                ON DUPLICATE KEY UPDATE ip = VALUES(ip), last_sync = NOW(), status = 'Online'");
+            $stmt->execute([$sn, $clientIp]);
+        }
     } catch (Exception $e) {}
 }
 

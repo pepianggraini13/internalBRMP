@@ -18,7 +18,8 @@ import {
   Plus,
   Trash2,
   MapPin,
-  HardDrive
+  HardDrive,
+  Calendar
 } from 'lucide-react';
 
 export default function AdmsMonitor({ user }) {
@@ -36,9 +37,11 @@ export default function AdmsMonitor({ user }) {
     user?.approvalRole === 'admin' ||
     user?.nip === '198001012005011001';
 
-  // Filters (for Admin mode)
+  // Filters
   const [filterEmployee, setFilterEmployee] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterDate, setFilterDate] = useState('all'); // 'all', 'today', 'yesterday', or specific YYYY-MM-DD
+  const [customDate, setCustomDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   // State Form Tambah Mesin Baru
@@ -57,7 +60,7 @@ export default function AdmsMonitor({ user }) {
       setLoading(true);
       const [mRes, lRes] = await Promise.all([
         apiService.getAdmsMachines(),
-        apiService.getAdmsLogs(user?.nip || '', isAdmin ? 'admin' : 'pegawai')
+        apiService.getAdmsLogs(user?.nip || '', isAdmin ? 'admin' : 'pegawai', 'all')
       ]);
       setMachines(mRes || []);
       setLogs(lRes || []);
@@ -135,6 +138,12 @@ export default function AdmsMonitor({ user }) {
     }
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dYest = new Date();
+  dYest.setDate(dYest.getDate() - 1);
+  const yestStr = dYest.toISOString().split('T')[0];
+  const availableDates = Array.from(new Set((logs || []).map(l => l.tanggal).filter(Boolean))).sort().reverse();
+
   // Filter logs strictly: Regular employees only see their own logs; Admin can see all with filters
   const displayedLogs = (logs || []).filter(item => {
     if (!isAdmin) {
@@ -159,6 +168,17 @@ export default function AdmsMonitor({ user }) {
 
     if (filterStatus !== 'all') {
       if (item.statusAbsen !== filterStatus) return false;
+    }
+
+    // Filter Tanggal (Semua Riwayat / Hari Ini / Kemarin / Tanggal Tertentu)
+    if (filterDate === 'today') {
+      if (item.tanggal !== todayStr) return false;
+    } else if (filterDate === 'yesterday') {
+      if (item.tanggal !== yestStr) return false;
+    } else if (filterDate === 'custom' && customDate) {
+      if (item.tanggal !== customDate) return false;
+    } else if (filterDate !== 'all') {
+      if (item.tanggal !== filterDate) return false;
     }
 
     if (searchQuery.trim()) {
@@ -255,7 +275,7 @@ export default function AdmsMonitor({ user }) {
       <div className="adms-grid">
 
         {/* Left: Info Konfigurasi & Mesin yang Terkoneksi */}
-        <div className="brmp-card" style={{ padding: '1.5rem' }}>
+        <div className="brmp-card" style={{ padding: '1.5rem', gridColumn: isAdmin ? 'auto' : '1 / -1' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <HardDrive size={20} style={{ color: 'var(--primary-600)' }} />
@@ -374,120 +394,122 @@ export default function AdmsMonitor({ user }) {
           </div>
         </div>
 
-        {/* Right: Form Tambah Mesin ADMS Baru */}
-        <div className="brmp-card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #f1f5f9' }}>
-            <Plus size={20} style={{ color: 'var(--primary-600)' }} />
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>
-              Tambah Mesin Presensi ADMS
-            </h3>
+        {/* Right: Form Tambah Mesin ADMS Baru (Khusus Akses Administrator) */}
+        {isAdmin && (
+          <div className="brmp-card" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #f1f5f9' }}>
+              <Plus size={20} style={{ color: 'var(--primary-600)' }} />
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>
+                Tambah Mesin Presensi ADMS
+              </h3>
+            </div>
+
+            <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.8rem', color: '#64748b' }}>
+              Daftarkan unit mesin presensi fingerprint / face recognition baru ke dalam sistem jaringan BRMP DIY:
+            </p>
+
+            <form onSubmit={handleAddMachine} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Nama Mesin Presensi <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="form-input"
+                  placeholder="Contoh: Mesin Fingerprint Lobi Timur Gedung A"
+                  value={newMachine.namaMesin}
+                  onChange={(e) => setNewMachine({ ...newMachine, namaMesin: e.target.value })}
+                  style={{ height: '40px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Serial Number (SN) Mesin <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="form-input"
+                  placeholder="Contoh: UCR6235200085 (tertera di belakang mesin)"
+                  value={newMachine.sn}
+                  onChange={(e) => setNewMachine({ ...newMachine, sn: e.target.value.toUpperCase() })}
+                  style={{ height: '40px', fontFamily: 'monospace', letterSpacing: '0.5px' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                    IP Address Mesin
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="192.168.2.75"
+                    value={newMachine.ip}
+                    onChange={(e) => setNewMachine({ ...newMachine, ip: e.target.value })}
+                    style={{ height: '40px', fontFamily: 'monospace' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                    Port Mesin
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="4370"
+                    value={newMachine.port}
+                    onChange={(e) => setNewMachine({ ...newMachine, port: e.target.value })}
+                    style={{ height: '40px', fontFamily: 'monospace' }}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                  Lokasi Pemasangan
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Contoh: Pintu Masuk Lobi Utama / Ruang Tata Usaha"
+                  value={newMachine.lokasi}
+                  onChange={(e) => setNewMachine({ ...newMachine, lokasi: e.target.value })}
+                  style={{ height: '40px' }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={machineLoading}
+                style={{
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                  color: '#fff',
+                  padding: '11px 18px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: machineLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginTop: '0.25rem',
+                  boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Plus size={18} />
+                <span>{machineLoading ? 'Mendaftarkan Mesin...' : 'Tambah Mesin Presensi'}</span>
+              </button>
+            </form>
           </div>
-
-          <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.8rem', color: '#64748b' }}>
-            Daftarkan unit mesin presensi fingerprint / face recognition baru ke dalam sistem jaringan BRMP DIY:
-          </p>
-
-          <form onSubmit={handleAddMachine} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                Nama Mesin Presensi <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                required
-                className="form-input"
-                placeholder="Contoh: Mesin Fingerprint Lobi Timur Gedung A"
-                value={newMachine.namaMesin}
-                onChange={(e) => setNewMachine({ ...newMachine, namaMesin: e.target.value })}
-                style={{ height: '40px' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                Serial Number (SN) Mesin <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                required
-                className="form-input"
-                placeholder="Contoh: UCR6235200085 (tertera di belakang mesin)"
-                value={newMachine.sn}
-                onChange={(e) => setNewMachine({ ...newMachine, sn: e.target.value.toUpperCase() })}
-                style={{ height: '40px', fontFamily: 'monospace', letterSpacing: '0.5px' }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                  IP Address Mesin
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="192.168.2.75"
-                  value={newMachine.ip}
-                  onChange={(e) => setNewMachine({ ...newMachine, ip: e.target.value })}
-                  style={{ height: '40px', fontFamily: 'monospace' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                  Port Mesin
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="4370"
-                  value={newMachine.port}
-                  onChange={(e) => setNewMachine({ ...newMachine, port: e.target.value })}
-                  style={{ height: '40px', fontFamily: 'monospace' }}
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                Lokasi Pemasangan
-              </label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Contoh: Pintu Masuk Lobi Utama / Ruang Tata Usaha"
-                value={newMachine.lokasi}
-                onChange={(e) => setNewMachine({ ...newMachine, lokasi: e.target.value })}
-                style={{ height: '40px' }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={machineLoading}
-              style={{
-                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                color: '#fff',
-                padding: '11px 18px',
-                borderRadius: '8px',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                cursor: machineLoading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                marginTop: '0.25rem',
-                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
-                transition: 'all 0.2s'
-              }}
-            >
-              <Plus size={18} />
-              <span>{machineLoading ? 'Mendaftarkan Mesin...' : 'Tambah Mesin Presensi'}</span>
-            </button>
-          </form>
-        </div>
+        )}
 
       </div>
 
@@ -524,42 +546,153 @@ export default function AdmsMonitor({ user }) {
           </div>
         </div>
 
-        {/* Admin Filter Controls Toolbar */}
-        {isAdmin && (
+        {/* Filter Controls Toolbar (Available for Admin & Pegawai) */}
+        <div style={{
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '10px',
+          padding: '14px 16px',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          {/* Quick Date Switcher Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Calendar size={14} style={{ color: 'var(--primary-600)' }} />
+              <span>Rentang Waktu:</span>
+            </span>
+
+            <button
+              type="button"
+              onClick={() => { setFilterDate('all'); setCustomDate(''); }}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                border: '1px solid',
+                borderColor: filterDate === 'all' ? 'var(--primary-600)' : '#cbd5e1',
+                background: filterDate === 'all' ? 'var(--primary-600)' : '#ffffff',
+                color: filterDate === 'all' ? '#ffffff' : '#334155',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Semua Riwayat (Full: {logs.length} Data)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setFilterDate('today'); setCustomDate(''); }}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                border: '1px solid',
+                borderColor: filterDate === 'today' ? 'var(--primary-600)' : '#cbd5e1',
+                background: filterDate === 'today' ? 'var(--primary-600)' : '#ffffff',
+                color: filterDate === 'today' ? '#ffffff' : '#334155',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Hari Ini ({logs.filter(l => l.tanggal === todayStr).length} Data)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setFilterDate('yesterday'); setCustomDate(''); }}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                border: '1px solid',
+                borderColor: filterDate === 'yesterday' ? 'var(--primary-600)' : '#cbd5e1',
+                background: filterDate === 'yesterday' ? 'var(--primary-600)' : '#ffffff',
+                color: filterDate === 'yesterday' ? '#ffffff' : '#334155',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Kemarin ({logs.filter(l => l.tanggal === yestStr).length} Data)
+            </button>
+          </div>
+
+          {/* Detailed Dropdown Filters & Search */}
           <div style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            padding: '12px 14px',
-            marginBottom: '1.25rem',
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
-            gap: '12px'
+            gap: '10px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
               <Filter size={15} style={{ color: 'var(--primary-600)' }} />
-              <span>Filter Data:</span>
+              <span>Detail Filter:</span>
             </div>
 
-            {/* Filter by Pegawai */}
+            {/* Filter by Tanggal Dropdown */}
             <select
-              value={filterEmployee}
-              onChange={(e) => setFilterEmployee(e.target.value)}
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
               style={{
                 padding: '7px 12px',
                 borderRadius: '8px',
                 border: '1px solid #cbd5e1',
                 fontSize: '0.82rem',
                 background: '#ffffff',
-                minWidth: '200px'
+                fontWeight: 600,
+                color: '#1e293b'
               }}
             >
-              <option value="all">Semua Pegawai ({logs.length} Log)</option>
-              {(allUsers.length > 0 ? allUsers : defaultEmployees).map(p => (
-                <option key={p.nip || p.id} value={p.nip}>{p.nama} ({p.nip})</option>
+              <option value="all">📅 Semua Tanggal (Full History)</option>
+              <option value="today">📅 Hari Ini ({todayStr})</option>
+              <option value="yesterday">📅 Kemarin ({yestStr})</option>
+              {availableDates.filter(d => d !== todayStr && d !== yestStr).map(d => (
+                <option key={d} value={d}>📅 Tanggal {d} ({(logs || []).filter(l => l.tanggal === d).length} Log)</option>
               ))}
+              <option value="custom">📅 Pilih Tanggal Tertentu...</option>
             </select>
+
+            {/* Custom Date Input (shown if "custom" is selected) */}
+            {filterDate === 'custom' && (
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--primary-600)',
+                  fontSize: '0.82rem',
+                  background: '#ffffff'
+                }}
+              />
+            )}
+
+            {/* Filter by Pegawai (Admin only) */}
+            {isAdmin && (
+              <select
+                value={filterEmployee}
+                onChange={(e) => setFilterEmployee(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.82rem',
+                  background: '#ffffff',
+                  minWidth: '200px'
+                }}
+              >
+                <option value="all">Semua Pegawai ({logs.length} Log)</option>
+                {(allUsers.length > 0 ? allUsers : defaultEmployees).map(p => (
+                  <option key={p.nip || p.id} value={p.nip}>{p.nama} ({p.nip})</option>
+                ))}
+              </select>
+            )}
 
             {/* Filter by Status */}
             <select
@@ -579,11 +712,11 @@ export default function AdmsMonitor({ user }) {
             </select>
 
             {/* Search Input */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
               <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input
                 type="text"
-                placeholder="Cari nama pegawai, NIP, atau SN mesin..."
+                placeholder={isAdmin ? "Cari nama pegawai, NIP, atau SN mesin..." : "Cari jam atau keterangan absen..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -597,10 +730,10 @@ export default function AdmsMonitor({ user }) {
               />
             </div>
 
-            {(filterEmployee !== 'all' || filterStatus !== 'all' || searchQuery.trim()) && (
+            {(filterEmployee !== 'all' || filterStatus !== 'all' || filterDate !== 'all' || searchQuery.trim() || customDate) && (
               <button
                 type="button"
-                onClick={() => { setFilterEmployee('all'); setFilterStatus('all'); setSearchQuery(''); }}
+                onClick={() => { setFilterEmployee('all'); setFilterStatus('all'); setFilterDate('all'); setCustomDate(''); setSearchQuery(''); }}
                 style={{
                   padding: '6px 12px',
                   borderRadius: '6px',
@@ -616,7 +749,7 @@ export default function AdmsMonitor({ user }) {
               </button>
             )}
           </div>
-        )}
+        </div>
 
         {/* Regular Pegawai Banner */}
         {!isAdmin && (

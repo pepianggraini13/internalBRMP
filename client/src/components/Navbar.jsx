@@ -1,7 +1,7 @@
 import React from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 
-export default function Navbar({ isMobileMenuOpen, onToggleMobileMenu }) {
+export default function Navbar({ user, isUserAdmin, isMobileMenuOpen, onToggleMobileMenu, onLogout }) {
   return (
     <header 
       className="top-navbar no-print" 
@@ -59,7 +59,7 @@ export default function Navbar({ isMobileMenuOpen, onToggleMobileMenu }) {
         </span>
       </div>
 
-      <div className="navbar-right">
+      <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <span style={{ 
           fontSize: '0.78rem', 
           fontWeight: 700, 
@@ -67,8 +67,42 @@ export default function Navbar({ isMobileMenuOpen, onToggleMobileMenu }) {
           letterSpacing: '0.04em',
           textTransform: 'uppercase'
         }}>
-          ADMINISTRATOR
+          {isUserAdmin ? 'ADMINISTRATOR' : (user?.roleLabel || user?.nama || 'PEGAWAI')}
         </span>
+
+        {/* Tombol Logout Navbar */}
+        <button
+          onClick={onLogout}
+          title="Keluar dari Akun"
+          aria-label="Logout"
+          style={{
+            background: 'rgba(239, 68, 68, 0.18)',
+            color: '#fecaca',
+            border: '1px solid rgba(248, 113, 113, 0.4)',
+            borderRadius: '7px',
+            padding: '5px 12px',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#dc2626';
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.borderColor = '#b91c1c';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.18)';
+            e.currentTarget.style.color = '#fecaca';
+            e.currentTarget.style.borderColor = 'rgba(248, 113, 113, 0.4)';
+          }}
+        >
+          <LogOut size={14} />
+          <span>Keluar</span>
+        </button>
       </div>
     </header>
   );
