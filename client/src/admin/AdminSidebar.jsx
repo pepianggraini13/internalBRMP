@@ -53,6 +53,47 @@ export default function AdminSidebar({
     return () => clearInterval(timer);
   }, []);
 
+  // Local tracking of active admin tab for instant visual feedback and preventing route collision
+  const [activeAdminTab, setActiveAdminTab] = useState(() => {
+    return sessionStorage.getItem('brmp_admin_tab') || 'dashboard';
+  });
+
+  useEffect(() => {
+    const handleTabChange = (e) => {
+      if (e?.detail) {
+        setActiveAdminTab(e.detail);
+      }
+    };
+    window.addEventListener('brmp-admin-tab-change', handleTabChange);
+    return () => window.removeEventListener('brmp-admin-tab-change', handleTabChange);
+  }, []);
+
+  useEffect(() => {
+    if (currentView === 'admin-pegawai') {
+      setActiveAdminTab('pegawai');
+      sessionStorage.removeItem('brmp_admin_tab');
+    } else if (currentView === 'admin-presensi') {
+      setActiveAdminTab('presensi');
+      sessionStorage.removeItem('brmp_admin_tab');
+    } else if (currentView === 'admin-cuti') {
+      setActiveAdminTab('cuti');
+      sessionStorage.removeItem('brmp_admin_tab');
+    } else if (currentView === 'admin-disposisi' || currentView === 'admin-agenda') {
+      setActiveAdminTab('disposisi');
+      sessionStorage.removeItem('brmp_admin_tab');
+    } else if (currentView === 'admin-pengaturan' || currentView === 'pengaturan-akun') {
+      setActiveAdminTab('pengaturan');
+      sessionStorage.removeItem('brmp_admin_tab');
+    } else if (currentView === 'dashboard' || currentView === 'admin-dashboard') {
+      const saved = sessionStorage.getItem('brmp_admin_tab');
+      if (saved === 'spt') {
+        setActiveAdminTab('spt');
+      } else {
+        setActiveAdminTab('dashboard');
+      }
+    }
+  }, [currentView]);
+
   const navigateTo = (view) => {
     if (setCurrentView) {
       setCurrentView(view);
@@ -62,27 +103,43 @@ export default function AdminSidebar({
     }
   };
 
+  const handleNavTab = (tabKey, viewName) => {
+    setActiveAdminTab(tabKey);
+    if (tabKey === 'spt') {
+      sessionStorage.setItem('brmp_admin_tab', 'spt');
+      window.dispatchEvent(new CustomEvent('brmp-admin-tab-change', { detail: 'spt' }));
+      navigateTo('admin-dashboard');
+    } else {
+      sessionStorage.removeItem('brmp_admin_tab');
+      window.dispatchEvent(new CustomEvent('brmp-admin-tab-change', { detail: tabKey }));
+      navigateTo(viewName);
+    }
+  };
+
   const isTabActive = (tabKey) => {
-    if (tabKey === 'dashboard') {
-      return currentView === 'dashboard' || currentView === 'admin-dashboard';
-    }
-    if (tabKey === 'pegawai') {
-      return currentView === 'admin-pegawai';
-    }
-    if (tabKey === 'presensi') {
-      return currentView === 'admin-presensi';
-    }
-    if (tabKey === 'cuti') {
-      return currentView === 'admin-cuti';
+    if (activeAdminTab === 'spt') {
+      return tabKey === 'spt';
     }
     if (tabKey === 'spt') {
-      return currentView === 'admin-spt';
+      return activeAdminTab === 'spt' || currentView === 'admin-spt';
+    }
+    if (tabKey === 'dashboard') {
+      return (currentView === 'dashboard' || currentView === 'admin-dashboard') && activeAdminTab !== 'spt';
+    }
+    if (tabKey === 'pegawai') {
+      return currentView === 'admin-pegawai' || activeAdminTab === 'pegawai';
+    }
+    if (tabKey === 'presensi') {
+      return currentView === 'admin-presensi' || activeAdminTab === 'presensi';
+    }
+    if (tabKey === 'cuti') {
+      return currentView === 'admin-cuti' || activeAdminTab === 'cuti';
     }
     if (tabKey === 'disposisi') {
-      return currentView === 'admin-disposisi' || currentView === 'admin-agenda';
+      return currentView === 'admin-disposisi' || currentView === 'admin-agenda' || activeAdminTab === 'disposisi';
     }
     if (tabKey === 'pengaturan') {
-      return currentView === 'admin-pengaturan' || currentView === 'pengaturan-akun';
+      return currentView === 'admin-pengaturan' || currentView === 'pengaturan-akun' || activeAdminTab === 'pengaturan';
     }
     return false;
   };
@@ -194,7 +251,7 @@ export default function AdminSidebar({
 
         <button 
           className={`nav-item-btn ${isTabActive('dashboard') ? 'active-green' : ''}`}
-          onClick={() => navigateTo('admin-dashboard')}
+          onClick={() => handleNavTab('dashboard', 'admin-dashboard')}
           style={{ borderRadius: '0 8px 8px 0', margin: '2px 0' }}
         >
           <div className="nav-item-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
@@ -225,7 +282,7 @@ export default function AdminSidebar({
 
         <button 
           className={`nav-item-btn ${isTabActive('pegawai') ? 'active-green' : ''}`}
-          onClick={() => navigateTo('admin-pegawai')}
+          onClick={() => handleNavTab('pegawai', 'admin-pegawai')}
           style={{ borderRadius: '0 8px 8px 0', margin: '2px 0' }}
         >
           <div className="nav-item-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
@@ -251,7 +308,7 @@ export default function AdminSidebar({
 
         <button 
           className={`nav-item-btn ${isTabActive('presensi') ? 'active-green' : ''}`}
-          onClick={() => navigateTo('admin-presensi')}
+          onClick={() => handleNavTab('presensi', 'admin-presensi')}
           style={{ borderRadius: '0 8px 8px 0', margin: '2px 0' }}
         >
           <div className="nav-item-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
@@ -282,7 +339,7 @@ export default function AdminSidebar({
 
         <button 
           className={`nav-item-btn ${isTabActive('cuti') ? 'active-green' : ''}`}
-          onClick={() => navigateTo('admin-cuti')}
+          onClick={() => handleNavTab('cuti', 'admin-cuti')}
           style={{ borderRadius: '0 8px 8px 0', margin: '2px 0' }}
         >
           <div className="nav-item-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
@@ -308,7 +365,7 @@ export default function AdminSidebar({
 
         <button 
           className={`nav-item-btn ${isTabActive('spt') ? 'active-green' : ''}`}
-          onClick={() => navigateTo('admin-spt')}
+          onClick={() => handleNavTab('spt', 'admin-dashboard')}
           style={{ borderRadius: '0 8px 8px 0', margin: '2px 0' }}
         >
           <div className="nav-item-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
@@ -334,7 +391,7 @@ export default function AdminSidebar({
 
         <button 
           className={`nav-item-btn ${isTabActive('disposisi') ? 'active-green' : ''}`}
-          onClick={() => navigateTo('admin-disposisi')}
+          onClick={() => handleNavTab('disposisi', 'admin-disposisi')}
           style={{ borderRadius: '0 8px 8px 0', margin: '2px 0' }}
         >
           <div className="nav-item-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
@@ -365,7 +422,7 @@ export default function AdminSidebar({
 
         <button 
           className={`nav-item-btn ${isTabActive('pengaturan') ? 'active-green' : ''}`}
-          onClick={() => navigateTo('admin-pengaturan')}
+          onClick={() => handleNavTab('pengaturan', 'admin-pengaturan')}
           style={{ borderRadius: '0 8px 8px 0', margin: '2px 0' }}
         >
           <div className="nav-item-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
