@@ -78,18 +78,17 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Admin sistem HANYA 1: NIP 198001012005011001 / PEG-ADM
   const isUserAdmin = Boolean(
     user && (
-      user.systemRole === 'admin' ||
-      user.role === 'admin' ||
-      user.approvalRole === 'admin' ||
-      user.approvalRole === 'kepegawaian' ||
+      (user.systemRole === 'admin' && user.approvalRole === 'admin') ||
       user.nip === '198001012005011001' ||
-      user.nip === '199005022025051006' ||
-      String(user.nama || '').toLowerCase().includes('romy') ||
       user.id === 'PEG-ADM' ||
-      user.id === 'PEG-005'
-    )
+      user.username === 'admin'
+    ) &&
+    user.nip !== '199005022025051006' &&
+    user.id !== 'PEG-005' &&
+    user.approvalRole !== 'kepegawaian'
   );
 
   const handleLoginSuccess = (userData, fromAdminGate = false) => {
@@ -103,20 +102,25 @@ export default function App() {
     localStorage.setItem('brmp_user', JSON.stringify(mergedUser));
 
     const isAdminUser = Boolean(
-      mergedUser.systemRole === 'admin' ||
-      mergedUser.role === 'admin' ||
-      mergedUser.approvalRole === 'admin' ||
+      (mergedUser.systemRole === 'admin' && mergedUser.approvalRole === 'admin') ||
       mergedUser.nip === '198001012005011001' ||
-      mergedUser.id === 'PEG-ADM'
-    );
+      mergedUser.id === 'PEG-ADM' ||
+      mergedUser.username === 'admin'
+    ) &&
+    mergedUser.nip !== '199005022025051006' &&
+    mergedUser.id !== 'PEG-005' &&
+    mergedUser.approvalRole !== 'kepegawaian';
 
-    if (isAdminUser || fromAdminGate) {
+    if (isAdminUser) {
       setCurrentView('admin-dashboard');
       if (typeof window !== 'undefined' && window.location.hash !== '#/admin' && !window.location.pathname.includes('/admin')) {
         window.history.pushState(null, '', '#/admin');
       }
     } else {
       setCurrentView('dashboard');
+      if (typeof window !== 'undefined' && (window.location.hash === '#/admin' || window.location.pathname.includes('/admin'))) {
+        window.history.pushState(null, '', '#/');
+      }
     }
   };
 

@@ -25,9 +25,9 @@ function findPegawai($identifier, $pdo, $useMysql) {
             $row = $stmt->fetch();
             if ($row) {
                 $isRomy = ($row['nip'] === '199005022025051006' || stripos($row['nama'], 'Romy') !== false);
-                $sysRole = $isRomy ? 'admin' : $row['system_role'];
+                $sysRole = $isRomy ? 'pegawai' : $row['system_role'];
                 $appRole = $isRomy ? 'kepegawaian' : $row['approval_role'];
-                $rLabel = $isRomy ? 'Administrator Kepegawaian (ACC Cuti)' : $row['role_label'];
+                $rLabel = $isRomy ? 'Petugas Kepegawaian (ACC Cuti)' : $row['role_label'];
 
                 return [
                     'id' => $row['pegawai_id'],
@@ -39,7 +39,7 @@ function findPegawai($identifier, $pdo, $useMysql) {
                     'divisi' => $row['divisi'] ?: 'Balai Penerapan Standar Instrumen Pertanian DIY',
                     'systemRole' => $sysRole,
                     'approvalRole' => $appRole,
-                    'sptRole' => $isRomy ? 'admin' : ($row['spt_role'] ?? ($row['sptRole'] ?? 'user')),
+                    'sptRole' => $isRomy ? 'user' : ($row['spt_role'] ?? ($row['sptRole'] ?? 'user')),
                     'roleLabel' => $rLabel,
                     'pinMesin' => $row['pin_mesin'] ?: '',
                     'sisaCuti' => (int)($row['sisa_cuti'] ?? 12),
@@ -64,7 +64,7 @@ function findPegawai($identifier, $pdo, $useMysql) {
             if ($row) {
                 $birthYear = !empty($row['tgl_lahir']) ? substr($row['tgl_lahir'], 0, 4) : '1980';
                 $isRomy = ($row['nip'] === '199005022025051006' || stripos($row['nama_ptk'], 'Romy') !== false);
-                $isAdminUser = ($clean === '198001012005011001' || $row['nip'] === '198001012005011001' || $isRomy);
+                $isAdminUser = ($clean === '198001012005011001' || $row['nip'] === '198001012005011001');
 
                 return [
                     'id' => (string)$row['id_ptk'],
@@ -77,7 +77,7 @@ function findPegawai($identifier, $pdo, $useMysql) {
                     'systemRole' => $isAdminUser ? 'admin' : 'pegawai',
                     'approvalRole' => $isRomy ? 'kepegawaian' : ($isAdminUser ? 'admin' : 'pemohon'),
                     'sptRole' => $isAdminUser ? 'admin' : 'user',
-                    'roleLabel' => $isRomy ? 'Administrator Kepegawaian (ACC Cuti)' : ($isAdminUser ? 'Administrator Sistem Kepegawaian' : 'Pegawai BRMP DIY'),
+                    'roleLabel' => $isRomy ? 'Petugas Kepegawaian (ACC Cuti)' : ($isAdminUser ? 'Administrator Sistem Kepegawaian' : 'Pegawai BRMP DIY'),
                     'pinMesin' => $row['nomor_absensi'] ?? $row['nip'],
                     'sisaCuti' => (int)($row['batas_cuti'] ?? 12),
                     'cutiTerpakai' => 0,
@@ -421,6 +421,7 @@ if ($route === 'users' || str_starts_with($route, 'users/')) {
 
         $roleLabel = 'Pegawai BRMP DIY';
         if ($approvalRole === 'admin') $roleLabel = 'Administrator Kepegawaian';
+        elseif ($approvalRole === 'kepegawaian') $roleLabel = 'Petugas Kepegawaian (ACC Cuti)';
         elseif ($approvalRole === 'verifikator_1') $roleLabel = 'Verifikator 1 (Ketua Tim Kerja)';
         elseif ($approvalRole === 'verifikator_2') $roleLabel = 'Verifikator 2 (Kepala Bagian TU)';
         elseif ($approvalRole === 'pemohon') $roleLabel = 'Pegawai (Pemohon Cuti)';
@@ -542,6 +543,7 @@ if ($route === 'users' || str_starts_with($route, 'users/')) {
 
         $roleLabel = null;
         if ($approvalRole === 'admin') $roleLabel = 'Administrator Kepegawaian';
+        elseif ($approvalRole === 'kepegawaian') $roleLabel = 'Petugas Kepegawaian (ACC Cuti)';
         elseif ($approvalRole === 'verifikator_1') $roleLabel = 'Verifikator 1 (Ketua Tim Kerja)';
         elseif ($approvalRole === 'verifikator_2') $roleLabel = 'Verifikator 2 (Kepala Bagian TU)';
         elseif ($approvalRole === 'pemohon') $roleLabel = 'Pegawai (Pemohon Cuti)';

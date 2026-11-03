@@ -92,12 +92,25 @@ export default function Sidebar({ currentView, setCurrentView, user, isUserAdmin
   };
 
   const isAdmin = Boolean(
-    isUserAdmin || 
-    user?.systemRole === 'admin' || 
-    user?.role === 'admin' || 
-    user?.approvalRole === 'admin' || 
-    user?.nip === '198001012005011001' || 
-    user?.id === 'PEG-ADM'
+    (
+      isUserAdmin || 
+      (user?.systemRole === 'admin' && user?.approvalRole === 'admin') || 
+      user?.nip === '198001012005011001' || 
+      user?.id === 'PEG-ADM' ||
+      user?.username === 'admin'
+    ) &&
+    user?.nip !== '199005022025051006' &&
+    user?.id !== 'PEG-005' &&
+    user?.approvalRole !== 'kepegawaian'
+  );
+
+  const isKepegawaian = Boolean(
+    user?.approvalRole === 'kepegawaian' || 
+    user?.role === 'kepegawaian' || 
+    user?.nip === '199005022025051006' || 
+    user?.id === 'PEG-005' ||
+    String(user?.nama || '').toLowerCase().includes('romy') ||
+    isAdmin
   );
 
   // If Admin mode, delegate to modular AdminSidebar
@@ -256,21 +269,23 @@ export default function Sidebar({ currentView, setCurrentView, user, isUserAdmin
               >
                 <span>• Form Pengajuan Cuti</span>
               </button>
-              <button 
-                className={`submenu-btn ${currentView === 'acc-cuti' ? 'active' : ''}`}
-                onClick={() => navigateTo('acc-cuti')}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-              >
-                <span>• ACC Cuti Pegawai</span>
-                <span style={{ 
-                  background: '#059669', 
-                  color: '#ffffff', 
-                  fontSize: '0.65rem', 
-                  padding: '1px 6px', 
-                  borderRadius: '10px',
-                  fontWeight: 800 
-                }}>ACC</span>
-              </button>
+              {isKepegawaian && (
+                <button 
+                  className={`submenu-btn ${currentView === 'acc-cuti' ? 'active' : ''}`}
+                  onClick={() => navigateTo('acc-cuti')}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <span>• ACC Cuti Pegawai</span>
+                  <span style={{ 
+                    background: '#059669', 
+                    color: '#ffffff', 
+                    fontSize: '0.65rem', 
+                    padding: '1px 6px', 
+                    borderRadius: '10px',
+                    fontWeight: 800 
+                  }}>ACC</span>
+                </button>
+              )}
             </div>
           )}
         </div>

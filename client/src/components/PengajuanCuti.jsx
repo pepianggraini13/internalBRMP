@@ -444,27 +444,29 @@ export default function PengajuanCuti({ user: initialUser, onSwitchUser, initial
     );
   };
 
-  // Determine permissions - Role Kepegawaian berwenang melakukan ACC Cuti 1 kali langsung
-  const isKepegawaian = 
-    currentUser?.approvalRole === 'kepegawaian' ||
-    currentUser?.approvalRole === 'admin' ||
-    currentUser?.systemRole === 'admin' ||
-    currentUser?.role === 'admin' ||
-    currentUser?.role === 'kepegawaian' ||
-    currentUser?.nip === '198001012005011001' ||
-    currentUser?.nip === '199005022025051006' ||
-    String(currentUser?.nama || '').toLowerCase().includes('romy') ||
-    String(currentUser?.divisi || '').toLowerCase().includes('kepegawaian') ||
-    String(currentUser?.divisi || '').toLowerCase().includes('sumber daya manusia') ||
-    String(currentUser?.jabatan || '').toLowerCase().includes('kepegawaian') ||
-    String(currentUser?.jabatan || '').toLowerCase().includes('sumber daya manusia');
+  // Admin sistem HANYA SATU (NIP 198001012005011001 / PEG-ADM)
+  const isAdmin = Boolean(
+    currentUser && (
+      (currentUser?.systemRole === 'admin' && currentUser?.approvalRole === 'admin') ||
+      currentUser?.nip === '198001012005011001' ||
+      currentUser?.id === 'PEG-ADM' ||
+      currentUser?.username === 'admin'
+    ) &&
+    currentUser?.nip !== '199005022025051006' &&
+    currentUser?.id !== 'PEG-005' &&
+    currentUser?.approvalRole !== 'kepegawaian'
+  );
 
-  const isAdmin = 
-    currentUser?.systemRole === 'admin' || 
-    currentUser?.approvalRole === 'admin' ||
-    currentUser?.nip === '198001012005011001' ||
+  // Role Kepegawaian (Romy Husodo) berwenang melakukan ACC Cuti 1 kali langsung
+  const isKepegawaian = Boolean(
+    currentUser?.approvalRole === 'kepegawaian' ||
+    currentUser?.role === 'kepegawaian' ||
     currentUser?.nip === '199005022025051006' ||
-    String(currentUser?.nama || '').toLowerCase().includes('romy');
+    currentUser?.id === 'PEG-005' ||
+    String(currentUser?.nama || '').toLowerCase().includes('romy') ||
+    isAdmin
+  );
+
   const isVerifikator1 = isKepegawaian;
   const isVerifikator2 = isKepegawaian;
 
