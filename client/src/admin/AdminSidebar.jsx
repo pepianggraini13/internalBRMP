@@ -10,6 +10,7 @@ import {
   LogOut, 
   Bell, 
   ArrowUpRight, 
+  ShieldCheck, 
   X 
 } from 'lucide-react';
 import './AdminDashboard.css';
