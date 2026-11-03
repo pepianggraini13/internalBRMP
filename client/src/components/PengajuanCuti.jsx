@@ -26,9 +26,15 @@ import {
 } from 'lucide-react';
 import CutiFormulirBkn from './CutiFormulirBkn';
 
-export default function PengajuanCuti({ user: initialUser, onSwitchUser }) {
+export default function PengajuanCuti({ user: initialUser, onSwitchUser, initialTab = "form" }) {
   // Active Tab: 'form' | 'my-history' | 'verification' | 'user-roles'
-  const [activeTab, setActiveTab] = useState('form');
+  const [activeTab, setActiveTab] = useState(initialTab || 'form');
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   const [currentUser, setCurrentUser] = useState(initialUser);
   const [cutiSummary, setCutiSummary] = useState({

@@ -233,10 +233,12 @@ export default function Sidebar({ currentView, setCurrentView, user, isUserAdmin
         {/* Cuti Pegawai */}
         <div>
           <button 
-            className={`nav-item-btn ${currentView === 'pengajuan-cuti' ? 'active' : ''}`}
+            className={`nav-item-btn ${currentView.includes('cuti') ? 'active' : ''}`}
             onClick={() => {
               setOpenCuti(!openCuti);
-              navigateTo('pengajuan-cuti');
+              if (!currentView.includes('cuti')) {
+                navigateTo('pengajuan-cuti');
+              }
             }}
           >
             <div className="nav-item-left">
@@ -252,7 +254,22 @@ export default function Sidebar({ currentView, setCurrentView, user, isUserAdmin
                 className={`submenu-btn ${currentView === 'pengajuan-cuti' ? 'active' : ''}`}
                 onClick={() => navigateTo('pengajuan-cuti')}
               >
-                <span>• Pengajuan & Persetujuan Cuti</span>
+                <span>• Form Pengajuan Cuti</span>
+              </button>
+              <button 
+                className={`submenu-btn ${currentView === 'acc-cuti' ? 'active' : ''}`}
+                onClick={() => navigateTo('acc-cuti')}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <span>• ACC Cuti Pegawai</span>
+                <span style={{ 
+                  background: '#059669', 
+                  color: '#ffffff', 
+                  fontSize: '0.65rem', 
+                  padding: '1px 6px', 
+                  borderRadius: '10px',
+                  fontWeight: 800 
+                }}>ACC</span>
               </button>
             </div>
           )}

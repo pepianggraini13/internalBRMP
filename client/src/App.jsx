@@ -264,7 +264,11 @@ export default function App() {
           )}
 
           {currentView === 'pengajuan-cuti' && (
-            <PengajuanCuti user={user} onSwitchUser={handleSwitchUser} />
+            <PengajuanCuti user={user} onSwitchUser={handleSwitchUser} initialTab="form" />
+          )}
+
+          {currentView === 'acc-cuti' && (
+            <PengajuanCuti user={user} onSwitchUser={handleSwitchUser} initialTab="verification" />
           )}
 
           {currentView === 'pengaturan-akun' && (

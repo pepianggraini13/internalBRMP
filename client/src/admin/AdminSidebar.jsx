@@ -289,7 +289,7 @@ export default function AdminSidebar({
               width: '30px',
               height: '30px',
               borderRadius: '8px',
-              background: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -297,10 +297,10 @@ export default function AdminSidebar({
               boxShadow: '0 3px 8px rgba(0, 0, 0, 0.25)',
               flexShrink: 0
             }}>
-              <CalendarCheck2 size={16} strokeWidth={2.4} />
+              <ShieldCheck size={16} strokeWidth={2.4} />
             </div>
             <span style={{ fontSize: '0.86rem', fontWeight: isTabActive('cuti') ? 800 : 600 }}>
-              Verifikasi Cuti Pegawai
+              ACC Cuti Pegawai
             </span>
           </div>
         </button>
